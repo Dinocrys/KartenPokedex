@@ -23,13 +23,30 @@
     .overlay{position:fixed;inset:0;background:rgba(0,0,0,.68);z-index:20;display:none;align-items:flex-end;justify-content:center}.overlay.open{display:flex}.sheet{width:min(900px,100%);max-height:92vh;overflow:auto;background:var(--panel);border:1px solid var(--line);border-radius:24px 24px 0 0;padding:18px 16px 28px;box-shadow:var(--shadow)}.handle{width:44px;height:5px;border-radius:99px;background:#475569;margin:0 auto 14px}.sheethead{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}.sheet h2{margin:0;font-size:22px}.sheet .dex{color:var(--muted);font-size:13px}.close{border:1px solid var(--line);background:var(--panel2);color:#fff;border-radius:12px;width:40px;height:40px}
     .actions{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin:16px 0}.primary,.secondary,.danger{border-radius:13px;padding:12px 14px;border:1px solid transparent;font-weight:700}.primary{background:var(--accent);color:#fff}.secondary{background:var(--panel2);border-color:var(--line);color:#fff}.danger{background:#3f1519;border-color:#6b1d26;color:#fecaca}.hint{color:var(--muted);font-size:12px}.field{margin-top:12px}.label{display:block;font-size:12px;color:var(--muted);margin-bottom:5px}.input,.note{width:100%;border:1px solid var(--line);background:#0f172a;color:#fff;border-radius:11px;padding:11px;outline:none}.note{min-height:66px;resize:vertical}
     .categoryPick{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:14px 0}.catbtn{border:1px solid var(--line);background:var(--panel2);color:var(--muted);border-radius:12px;padding:11px 7px;font-weight:700}.catbtn.active{background:#312e81;border-color:#4f46e5;color:#fff}.photoPreview{margin-top:12px;border:1px dashed var(--line);border-radius:14px;overflow:hidden;min-height:100px;display:grid;place-items:center;color:var(--muted);background:#0f172a}.photoPreview img{width:100%;max-height:360px;object-fit:contain;display:block}.qtyrow{display:flex;align-items:center;gap:10px}.qtybtn{width:42px;height:42px;border-radius:10px;border:1px solid var(--line);background:var(--panel2);color:#fff;font-size:22px}.qtynum{min-width:44px;text-align:center;font-size:18px;font-weight:800}.detailImg{width:100%;max-height:420px;object-fit:contain;border-radius:14px;background:#0f172a;border:1px solid var(--line)}.detailActions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}.tools{display:none;margin:0 16px 18px;background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:12px}.tools.open{display:block}.toolgrid{display:grid;grid-template-columns:1fr 1fr;gap:8px}.toolgrid button{border:1px solid var(--line);background:var(--panel2);color:#fff;border-radius:11px;padding:10px}.status{padding:18px 16px;color:var(--muted);text-align:center}input[type=file]{display:none}.pickerResults{max-height:220px;overflow:auto;border:1px solid var(--line);border-radius:10px;margin-top:7px;background:#0f172a;display:none}.pickerResults.open{display:block}.pickrow{padding:9px 10px;border-bottom:1px solid var(--line);cursor:pointer}.pickrow:last-child{border-bottom:0}.pickrow small{color:var(--muted)}
+
+    .cameraScreen{position:fixed;inset:0;z-index:50;background:#000;display:none;overflow:hidden}
+    .cameraScreen.open{display:block}
+    .cameraVideo{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;background:#000}
+    .cameraShade{position:absolute;inset:0;pointer-events:none;display:grid;place-items:center}
+    .cardGuide{width:min(76vw,360px);aspect-ratio:63/88;border:3px solid rgba(255,255,255,.95);border-radius:13px;box-shadow:0 0 0 200vmax rgba(0,0,0,.46);position:relative}
+    .cardGuide:before,.cardGuide:after{content:"";position:absolute;width:24px;height:24px;border-color:#86efac}
+    .cardGuide:before{left:-4px;top:-4px;border-left:4px solid #86efac;border-top:4px solid #86efac;border-radius:10px 0 0 0}
+    .cardGuide:after{right:-4px;bottom:-4px;border-right:4px solid #86efac;border-bottom:4px solid #86efac;border-radius:0 0 10px 0}
+    .cameraHint{position:absolute;left:16px;right:16px;top:max(26px,env(safe-area-inset-top));text-align:center;color:white;font-weight:700;text-shadow:0 2px 8px #000;background:rgba(0,0,0,.28);padding:8px 10px;border-radius:12px}
+    .cameraControls{position:absolute;left:0;right:0;bottom:max(20px,env(safe-area-inset-bottom));display:flex;align-items:center;justify-content:center;gap:28px;padding:16px}
+    .cameraRound{width:54px;height:54px;border-radius:50%;border:1px solid rgba(255,255,255,.5);background:rgba(17,24,39,.72);color:#fff;font-size:22px;display:grid;place-items:center}
+    .shutter{width:76px;height:76px;border-radius:50%;border:5px solid white;background:rgba(255,255,255,.25);box-shadow:0 0 0 2px rgba(0,0,0,.3)}
+    .shutter:active{transform:scale(.94)}
+    .cameraError{position:absolute;inset:0;display:none;place-items:center;padding:28px;background:#0b1020;color:#fff;text-align:center;z-index:3}
+    .cameraError.show{display:grid}
+
     @media(min-width:650px){.grid{grid-template-columns:repeat(3,minmax(0,1fr))}.controls{top:156px}}
   </style>
 </head>
 <body>
 <div class="app">
   <header>
-    <div class="titlebar"><div class="ball"></div><div style="min-width:0;flex:1"><h1>Mein Karten-Pokédex</h1><div class="subtitle">Pokédex & Kartensammlung</div></div><button id="installBtn" class="headbtn" title="App installieren">↓</button><button id="menuBtn" class="headbtn" title="Menü">☰</button></div>
+    <div class="titlebar"><div class="ball"></div><div style="min-width:0;flex:1"><h1>Mein Karten-Pokédex</h1><div class="subtitle">Pokédex & Kartensammlung · v3.1</div></div><button id="installBtn" class="headbtn" title="App installieren">↓</button><button id="menuBtn" class="headbtn" title="Menü">☰</button></div>
     <div class="tabbar"><button class="tab active" data-tab="dex">Pokédex</button><button class="tab" data-tab="cards">Alle Karten</button></div>
     <div class="stats" id="stats"><div class="statrow"><span><strong id="collected">0</strong> gesammelt</span><span><strong id="total">1025</strong> Pokémon</span><span id="pct">0 %</span></div><div class="progress"><div id="bar"></div></div></div>
   </header>
@@ -45,6 +62,25 @@
 <input id="photoInput" type="file" accept="image/*" capture="environment"><input id="galleryInput" type="file" accept="image/*"><input id="importInput" type="file" accept="application/json,.json">
 <div id="addModal" class="overlay"><section class="sheet"><div class="handle"></div><div class="sheethead"><div><div class="dex">Neue Karte</div><h2>Karte hinzufügen</h2></div><button class="close" data-close="addModal">✕</button></div><div class="categoryPick"><button class="catbtn active" data-cat="pokemon">Pokémon</button><button class="catbtn" data-cat="trainer">Trainer</button><button class="catbtn" data-cat="energy">Energie</button></div><div id="pokemonFields"><div class="field"><label class="label">Pokémon</label><input id="pokemonPicker" class="input" placeholder="z. B. Glurak oder 6" autocomplete="off"><div id="pickerResults" class="pickerResults"></div></div><div class="hint" id="selectedPokemonHint" style="margin-top:6px">Noch kein Pokémon ausgewählt.</div></div><div id="genericFields" hidden><div class="field"><label class="label">Kartenname</label><input id="genericName" class="input" placeholder="z. B. Hyperball"></div></div><div class="actions"><button id="takePhoto" class="primary">Foto aufnehmen</button><button id="pickPhoto" class="secondary">Aus Galerie</button></div><div id="photoPreview" class="photoPreview">Noch kein Foto ausgewählt.</div><div class="field"><label class="label">Menge</label><div class="qtyrow"><button id="qtyMinus" class="qtybtn">−</button><div id="qtyValue" class="qtynum">1</div><button id="qtyPlus" class="qtybtn">+</button></div></div><div class="field"><label class="label">Notiz (optional)</label><textarea id="newNote" class="note" placeholder="z. B. Set, Sprache, Fundort …"></textarea></div><div class="field" id="dexToggleWrap"><label style="display:flex;gap:9px;align-items:center"><input id="useForDex" type="checkbox" checked> Als Pokédex-Karte verwenden</label><div class="hint" style="margin-top:4px">Diese Karte wird im Pokédex als Hauptkarte angezeigt.</div></div><button id="saveCard" class="primary" style="width:100%;margin-top:16px">Karte speichern</button></section></div>
 <div id="detailModal" class="overlay"><section class="sheet"><div class="handle"></div><div class="sheethead"><div><div class="dex" id="detailSub"></div><h2 id="detailName"></h2></div><button class="close" data-close="detailModal">✕</button></div><img id="detailImg" class="detailImg" alt="Kartenfoto"><div class="field"><label class="label">Menge</label><div class="qtyrow"><button id="detailMinus" class="qtybtn">−</button><div id="detailQty" class="qtynum">1</div><button id="detailPlus" class="qtybtn">+</button></div></div><div class="field"><label class="label">Notiz</label><textarea id="detailNote" class="note"></textarea></div><div class="detailActions"><button id="setDexBtn" class="secondary">Als Pokédex-Karte</button><button id="saveDetail" class="primary">Speichern</button></div><button id="deleteCard" class="danger" style="width:100%;margin-top:8px">Karte löschen</button></section></div>
+
+<div id="cameraScreen" class="cameraScreen">
+  <video id="cameraVideo" class="cameraVideo" autoplay playsinline muted></video>
+  <div class="cameraShade"><div id="cardGuide" class="cardGuide"></div></div>
+  <div class="cameraHint">Karte möglichst genau in den Rahmen halten</div>
+  <div id="cameraError" class="cameraError">
+    <div>
+      <strong>Kamera konnte nicht geöffnet werden.</strong>
+      <div class="hint" style="margin-top:8px">Prüfe die Kameraberechtigung der App. Alternativ kannst du „Aus Galerie“ verwenden.</div>
+      <button id="cameraErrorClose" class="secondary" style="margin-top:16px">Zurück</button>
+    </div>
+  </div>
+  <div class="cameraControls">
+    <button id="closeCamera" class="cameraRound" title="Schließen">✕</button>
+    <button id="captureCamera" class="shutter" title="Foto aufnehmen"></button>
+    <button id="switchCamera" class="cameraRound" title="Kamera wechseln">↻</button>
+  </div>
+</div>
+
 <script>
 const DATA_URLS=['https://raw.githubusercontent.com/steffanossa/pokemon_dataset/main/pkmn_dataset.csv','https://cdn.jsdelivr.net/gh/steffanossa/pokemon_dataset@main/pkmn_dataset.csv'];
 const CACHE_KEY='dePokedexV1';let pokedex=[],cards=[],dexMap={},currentTab='dex',dexFilter='all',cardFilter='all',newCategory='pokemon',newPokemonId=null,newPhotoBlob=null,newQty=1,detailCardId=null,deferredInstallPrompt=null;
@@ -57,7 +93,76 @@ async function render(){const q=norm(document.querySelector('#search').value),gr
 function setTab(tab){currentTab=tab;document.querySelectorAll('.tab').forEach(b=>b.classList.toggle('active',b.dataset.tab===tab));document.querySelector('#chipsDex').hidden=tab!=='dex';document.querySelector('#chipsCards').hidden=tab!=='cards';document.querySelector('#stats').style.display=tab==='dex'?'block':'none';document.querySelector('#search').placeholder=tab==='dex'?'Pokémon oder Nummer suchen …':'Karten durchsuchen …';render()}document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>setTab(b.dataset.tab));document.querySelector('#chipsDex').querySelectorAll('.chip').forEach(b=>b.onclick=()=>{document.querySelector('#chipsDex').querySelectorAll('.chip').forEach(x=>x.classList.remove('active'));b.classList.add('active');dexFilter=b.dataset.filter;render()});document.querySelector('#chipsCards').querySelectorAll('.chip').forEach(b=>b.onclick=()=>{document.querySelector('#chipsCards').querySelectorAll('.chip').forEach(x=>x.classList.remove('active'));b.classList.add('active');cardFilter=b.dataset.filter;render()});document.querySelector('#search').addEventListener('input',render);
 function resetAdd(){newCategory='pokemon';newPokemonId=null;newPhotoBlob=null;newQty=1;document.querySelectorAll('.catbtn').forEach(b=>b.classList.toggle('active',b.dataset.cat==='pokemon'));document.querySelector('#pokemonFields').hidden=false;document.querySelector('#genericFields').hidden=true;document.querySelector('#dexToggleWrap').hidden=false;document.querySelector('#pokemonPicker').value='';document.querySelector('#genericName').value='';document.querySelector('#newNote').value='';document.querySelector('#qtyValue').textContent='1';document.querySelector('#photoPreview').innerHTML='Noch kein Foto ausgewählt.';document.querySelector('#selectedPokemonHint').textContent='Noch kein Pokémon ausgewählt.';document.querySelector('#useForDex').checked=true;document.querySelector('#pickerResults').classList.remove('open')}function openAdd(){resetAdd();document.querySelector('#addModal').classList.add('open')}function openAddForPokemon(id){openAdd();selectPokemon(id)}function selectPokemon(id){const p=pokeById(id);if(!p)return;newPokemonId=p.id;document.querySelector('#pokemonPicker').value=p.name;document.querySelector('#selectedPokemonHint').textContent=`${dex(p.id)} – ${p.name}`;document.querySelector('#pickerResults').classList.remove('open')}
 document.querySelectorAll('.catbtn').forEach(b=>b.onclick=()=>{newCategory=b.dataset.cat;document.querySelectorAll('.catbtn').forEach(x=>x.classList.toggle('active',x===b));const isP=newCategory==='pokemon';document.querySelector('#pokemonFields').hidden=!isP;document.querySelector('#genericFields').hidden=isP;document.querySelector('#dexToggleWrap').hidden=!isP});document.querySelector('#pokemonPicker').addEventListener('input',e=>{newPokemonId=null;const q=norm(e.target.value),box=document.querySelector('#pickerResults');box.innerHTML='';if(!q){box.classList.remove('open');return}const hits=pokedex.filter(p=>norm(p.name).includes(q)||norm(p.en).includes(q)||String(p.id).startsWith(q.replace('#',''))).slice(0,12);for(const p of hits){const d=document.createElement('div');d.className='pickrow';d.innerHTML=`<strong>${escapeHtml(p.name)}</strong> <small>${dex(p.id)}</small>`;d.onclick=()=>selectPokemon(p.id);box.appendChild(d)}box.classList.toggle('open',!!hits.length)});document.querySelector('#qtyMinus').onclick=()=>{newQty=Math.max(1,newQty-1);document.querySelector('#qtyValue').textContent=newQty};document.querySelector('#qtyPlus').onclick=()=>{newQty++;document.querySelector('#qtyValue').textContent=newQty};
-async function compressImage(file){const bmp=await createImageBitmap(file),max=1600,scale=Math.min(1,max/Math.max(bmp.width,bmp.height)),w=Math.round(bmp.width*scale),h=Math.round(bmp.height*scale),c=document.createElement('canvas');c.width=w;c.height=h;c.getContext('2d').drawImage(bmp,0,0,w,h);bmp.close();return await new Promise(res=>c.toBlob(res,'image/jpeg',.84))}async function choosePhoto(file){if(!file)return;newPhotoBlob=await compressImage(file);const u=URL.createObjectURL(newPhotoBlob),img=new Image();img.src=u;img.onload=()=>URL.revokeObjectURL(u);const box=document.querySelector('#photoPreview');box.innerHTML='';box.appendChild(img)}document.querySelector('#takePhoto').onclick=()=>document.querySelector('#photoInput').click();document.querySelector('#pickPhoto').onclick=()=>document.querySelector('#galleryInput').click();document.querySelector('#photoInput').onchange=async e=>{await choosePhoto(e.target.files?.[0]);e.target.value=''};document.querySelector('#galleryInput').onchange=async e=>{await choosePhoto(e.target.files?.[0]);e.target.value=''};
+async function compressImage(file){
+  const bmp=await createImageBitmap(file),max=1600,scale=Math.min(1,max/Math.max(bmp.width,bmp.height));
+  const w=Math.round(bmp.width*scale),h=Math.round(bmp.height*scale),c=document.createElement('canvas');
+  c.width=w;c.height=h;c.getContext('2d').drawImage(bmp,0,0,w,h);bmp.close();
+  return await new Promise(res=>c.toBlob(res,'image/jpeg',.84));
+}
+function showPhotoPreview(blob){
+  newPhotoBlob=blob;
+  const u=URL.createObjectURL(blob),img=new Image();img.src=u;img.onload=()=>URL.revokeObjectURL(u);
+  const box=document.querySelector('#photoPreview');box.innerHTML='';box.appendChild(img);
+}
+async function choosePhoto(file){if(!file)return;showPhotoPreview(await compressImage(file))}
+
+let cameraStream=null,cameraFacing='environment';
+function stopCamera(){
+  if(cameraStream){cameraStream.getTracks().forEach(t=>t.stop());cameraStream=null}
+  document.querySelector('#cameraVideo').srcObject=null;
+}
+async function getCameraStream(facing){
+  try{
+    return await navigator.mediaDevices.getUserMedia({audio:false,video:{facingMode:{exact:facing},width:{ideal:1920},height:{ideal:1080}}});
+  }catch(e){
+    return await navigator.mediaDevices.getUserMedia({audio:false,video:{facingMode:{ideal:facing},width:{ideal:1920},height:{ideal:1080}}});
+  }
+}
+async function startCamera(facing='environment'){
+  if(!navigator.mediaDevices?.getUserMedia)throw new Error('Kamera wird nicht unterstützt');
+  stopCamera();cameraFacing=facing;
+  cameraStream=await getCameraStream(facing);
+  const v=document.querySelector('#cameraVideo');v.srcObject=cameraStream;await v.play();
+}
+async function openInAppCamera(){
+  const s=document.querySelector('#cameraScreen'),err=document.querySelector('#cameraError');
+  err.classList.remove('show');s.classList.add('open');
+  try{await startCamera('environment')}catch(e){err.classList.add('show')}
+}
+function closeInAppCamera(){
+  stopCamera();document.querySelector('#cameraScreen').classList.remove('open');document.querySelector('#cameraError').classList.remove('show');
+}
+async function captureGuideArea(){
+  const video=document.querySelector('#cameraVideo'),guide=document.querySelector('#cardGuide');
+  if(!video.videoWidth||!video.videoHeight)return;
+  const vr=video.getBoundingClientRect(),gr=guide.getBoundingClientRect();
+  const scale=Math.max(vr.width/video.videoWidth,vr.height/video.videoHeight);
+  const displayedW=video.videoWidth*scale,displayedH=video.videoHeight*scale;
+  const offsetX=(vr.width-displayedW)/2,offsetY=(vr.height-displayedH)/2;
+  let sx=(gr.left-vr.left-offsetX)/scale,sy=(gr.top-vr.top-offsetY)/scale,sw=gr.width/scale,sh=gr.height/scale;
+  sx=Math.max(0,Math.min(video.videoWidth-1,sx));sy=Math.max(0,Math.min(video.videoHeight-1,sy));
+  sw=Math.min(sw,video.videoWidth-sx);sh=Math.min(sh,video.videoHeight-sy);
+  const canvas=document.createElement('canvas'),targetW=756,targetH=Math.round(targetW*88/63);
+  canvas.width=targetW;canvas.height=targetH;
+  canvas.getContext('2d').drawImage(video,sx,sy,sw,sh,0,0,targetW,targetH);
+  const blob=await new Promise(res=>canvas.toBlob(res,'image/jpeg',.88));
+  if(blob){showPhotoPreview(blob);closeInAppCamera()}
+}
+document.querySelector('#takePhoto').onclick=openInAppCamera;
+document.querySelector('#pickPhoto').onclick=()=>document.querySelector('#galleryInput').click();
+document.querySelector('#galleryInput').onchange=async e=>{
+  try{await choosePhoto(e.target.files?.[0])}catch(err){alert('Bild konnte nicht verarbeitet werden: '+err.message)}
+  e.target.value='';
+};
+document.querySelector('#closeCamera').onclick=closeInAppCamera;
+document.querySelector('#cameraErrorClose').onclick=closeInAppCamera;
+document.querySelector('#captureCamera').onclick=captureGuideArea;
+document.querySelector('#switchCamera').onclick=async()=>{
+  const next=cameraFacing==='environment'?'user':'environment';
+  try{document.querySelector('#cameraError').classList.remove('show');await startCamera(next)}
+  catch(e){document.querySelector('#cameraError').classList.add('show')}
+};
+document.addEventListener('visibilitychange',()=>{if(document.hidden&&document.querySelector('#cameraScreen').classList.contains('open'))stopCamera()});
 document.querySelector('#saveCard').onclick=async()=>{if(!newPhotoBlob){alert('Bitte zuerst ein Foto auswählen.');return}let name='',pokemonId=null;if(newCategory==='pokemon'){if(!newPokemonId){alert('Bitte ein Pokémon auswählen.');return}pokemonId=newPokemonId;name=pokeById(pokemonId)?.name||'Pokémon'}else{name=document.querySelector('#genericName').value.trim();if(!name){alert('Bitte einen Kartennamen eingeben.');return}}const c={id:crypto.randomUUID(),category:newCategory,pokemonId,name,image:newPhotoBlob,quantity:newQty,note:document.querySelector('#newNote').value.trim(),addedAt:Date.now()};await txPut('cards',c);if(newCategory==='pokemon'&&document.querySelector('#useForDex').checked)await setDexCard(pokemonId,c.id);document.querySelector('#addModal').classList.remove('open');await reloadData()};
 async function openDetail(id){const c=cardById(id);if(!c)return;detailCardId=id;const p=c.category==='pokemon'?pokeById(c.pokemonId):null;document.querySelector('#detailName').textContent=p?.name||c.name;document.querySelector('#detailSub').textContent=c.category==='pokemon'?(p?dex(p.id):'Pokémon'):(c.category==='trainer'?'Trainer':'Energie');document.querySelector('#detailQty').textContent=Number(c.quantity)||1;document.querySelector('#detailNote').value=c.note||'';const u=URL.createObjectURL(c.image);document.querySelector('#detailImg').src=u;document.querySelector('#detailImg').onload=()=>URL.revokeObjectURL(u);const dexBtn=document.querySelector('#setDexBtn');if(c.category==='pokemon'){dexBtn.hidden=false;dexBtn.textContent=dexMap[c.pokemonId]===c.id?'Ist Pokédex-Karte ✓':'Als Pokédex-Karte'}else dexBtn.hidden=true;document.querySelector('#detailModal').classList.add('open')}function currentDetail(){return cardById(detailCardId)}document.querySelector('#detailMinus').onclick=()=>{const c=currentDetail();if(!c)return;c.quantity=Math.max(1,(Number(c.quantity)||1)-1);document.querySelector('#detailQty').textContent=c.quantity};document.querySelector('#detailPlus').onclick=()=>{const c=currentDetail();if(!c)return;c.quantity=(Number(c.quantity)||1)+1;document.querySelector('#detailQty').textContent=c.quantity};document.querySelector('#saveDetail').onclick=async()=>{const c=currentDetail();if(!c)return;c.note=document.querySelector('#detailNote').value;c.quantity=Number(document.querySelector('#detailQty').textContent)||1;await txPut('cards',c);document.querySelector('#detailModal').classList.remove('open');await reloadData()};document.querySelector('#setDexBtn').onclick=async()=>{const c=currentDetail();if(!c||c.category!=='pokemon')return;await setDexCard(c.pokemonId,c.id);document.querySelector('#setDexBtn').textContent='Ist Pokédex-Karte ✓';await reloadData()};document.querySelector('#deleteCard').onclick=async()=>{const c=currentDetail();if(!c||!confirm('Diese Karte wirklich löschen?'))return;await clearDexIfCard(c);await txDel('cards',c.id);document.querySelector('#detailModal').classList.remove('open');await reloadData()};
 document.querySelector('#fab').onclick=openAdd;document.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>document.querySelector('#'+b.dataset.close).classList.remove('open'));document.querySelectorAll('.overlay').forEach(o=>o.addEventListener('click',e=>{if(e.target===o)o.classList.remove('open')}));
