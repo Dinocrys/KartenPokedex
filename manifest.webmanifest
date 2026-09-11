@@ -1,11 +1,14 @@
 {
   "name": "Mein Karten-Pokédex",
   "short_name": "KartenDex",
+  "id": "./",
+  "scope": "./",
   "start_url": "./",
   "display": "standalone",
+  "orientation": "portrait-primary",
   "background_color": "#0b1020",
   "theme_color": "#111827",
-  "description": "Deutscher Pokédex zum Sammeln eigener Pokémon-Karten.",
+  "description": "Pokédex und Verwaltung der eigenen Pokémon-Kartensammlung.",
   "icons": [
     {
       "src": "icon-192.png",
@@ -17,12 +20,5 @@
       "sizes": "512x512",
       "type": "image/png"
     }
-  ],
-  "id": "./",
-  "scope": "./",
-  "orientation": "portrait-primary",
-  "categories": [
-    "games",
-    "utilities"
   ]
 }
