@@ -1,12 +1,10 @@
-# KartenPokédex v3.7
+# KartenPokédex v3.8
 
-Neu in v3.7:
+Neu in v3.8:
 
-- Bildbasierte Duplikatwarnung für Pokémon-Karten.
-- Beim Speichern wird das neue, bereits zugeschnittene Kartenbild nur mit vorhandenen Karten desselben Pokémon verglichen.
-- Bei hoher Ähnlichkeit werden vorhandene und neue Karte nebeneinander gezeigt.
-- Drei Entscheidungen: „Schon erfasst – nicht hinzufügen“, „Weiteres Exemplar – Menge erhöhen“ oder „Andere Variante – separat speichern“.
-- Die Warnung führt niemals automatisch Karten zusammen; die Entscheidung bleibt immer beim Nutzer.
-- Visuelle Fingerabdrücke werden lokal pro Karte gespeichert, damit spätere Prüfungen schneller werden.
-- Im Stapelmodus werden übersprungene bereits erfasste Karten gezählt und automatisch mit dem nächsten Bild fortgesetzt.
-- Bestehende v3-Daten und Backups bleiben kompatibel; alte Karten erhalten ihren Fingerabdruck bei Bedarf automatisch.
+- Im Stapelmodus gibt es jetzt „Bild überspringen“. So können falsch zugeschnittene, unscharfe oder versehentlich ausgewählte Fotos direkt ausgelassen werden.
+- Beim letzten Bild heißt der Button „Letztes Bild überspringen“ und beendet den Stapel sauber.
+- Die Abschlussmeldung fasst gespeicherte und übersprungene Bilder zusammen.
+- In „Alle Karten“ wurde die doppelte Mengenanzeige entfernt: Die Menge steht nur noch als Badge oben rechts (z. B. ×1).
+- Wenn Exemplare tauschbar sind, wird darunter nur noch die relevante Angabe „x× tauschbar“ angezeigt.
+- Alle Funktionen aus v3.7 bleiben erhalten, einschließlich Stapelmodus, Pokédex-Vergleich, Duplikatwarnung und automatischem Zuschnitt.
