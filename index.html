@@ -53,7 +53,7 @@
 <body>
 <div class="app">
   <header>
-    <div class="titlebar"><div class="ball"></div><div style="min-width:0;flex:1"><h1>Mein Karten-Pokédex</h1><div class="subtitle">Pokédex & Kartensammlung · v3.4</div></div><button id="installBtn" class="headbtn" title="App installieren">↓</button><button id="menuBtn" class="headbtn" title="Menü">☰</button></div>
+    <div class="titlebar"><div class="ball"></div><div style="min-width:0;flex:1"><h1>Mein Karten-Pokédex</h1><div class="subtitle">Pokédex & Kartensammlung · v3.5</div></div><button id="installBtn" class="headbtn" title="App installieren">↓</button><button id="menuBtn" class="headbtn" title="Menü">☰</button></div>
     <div class="tabbar"><button class="tab active" data-tab="dex">Pokédex</button><button class="tab" data-tab="cards">Alle Karten</button></div>
     <div class="stats" id="stats"><div class="statrow"><span><strong id="collected">0</strong> gesammelt</span><span><strong id="total">1025</strong> Pokémon</span><span id="pct">0 %</span></div><div class="progress"><div id="bar"></div></div></div>
   </header>
@@ -113,18 +113,179 @@ async function render(){const q=norm(document.querySelector('#search').value),gr
 function setTab(tab){currentTab=tab;document.querySelectorAll('.tab').forEach(b=>b.classList.toggle('active',b.dataset.tab===tab));document.querySelector('#chipsDex').hidden=tab!=='dex';document.querySelector('#chipsCards').hidden=tab!=='cards';document.querySelector('#stats').style.display=tab==='dex'?'block':'none';document.querySelector('#search').placeholder=tab==='dex'?'Pokémon oder Nummer suchen …':'Karten durchsuchen …';render()}document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>setTab(b.dataset.tab));document.querySelector('#chipsDex').querySelectorAll('.chip').forEach(b=>b.onclick=()=>{document.querySelector('#chipsDex').querySelectorAll('.chip').forEach(x=>x.classList.remove('active'));b.classList.add('active');dexFilter=b.dataset.filter;render()});document.querySelector('#chipsCards').querySelectorAll('.chip').forEach(b=>b.onclick=()=>{document.querySelector('#chipsCards').querySelectorAll('.chip').forEach(x=>x.classList.remove('active'));b.classList.add('active');cardFilter=b.dataset.filter;render()});document.querySelector('#search').addEventListener('input',render);
 function resetAdd(){newCategory='pokemon';newPokemonId=null;newPhotoBlob=null;newQty=1;newTradeFrom=5;document.querySelectorAll('.catbtn').forEach(b=>b.classList.toggle('active',b.dataset.cat==='pokemon'));document.querySelector('#pokemonFields').hidden=false;document.querySelector('#genericFields').hidden=true;document.querySelector('#dexToggleWrap').hidden=false;document.querySelector('#pokemonPicker').value='';document.querySelector('#genericName').value='';document.querySelector('#newNote').value='';document.querySelector('#qtyValue').textContent='1';document.querySelector('#newTradeValue').textContent='5';document.querySelector('#newTradeHint').textContent=tradeHint(5);document.querySelector('#photoPreview').innerHTML='Noch kein Foto ausgewählt.';document.querySelector('#selectedPokemonHint').textContent='Noch kein Pokémon ausgewählt.';document.querySelector('#useForDex').checked=true;document.querySelector('#pickerResults').classList.remove('open')}function openAdd(){resetAdd();document.querySelector('#addModal').classList.add('open')}function openAddForPokemon(id){openAdd();selectPokemon(id)}function selectPokemon(id){const p=pokeById(id);if(!p)return;newPokemonId=p.id;document.querySelector('#pokemonPicker').value=p.name;document.querySelector('#selectedPokemonHint').textContent=`${dex(p.id)} – ${p.name}`;document.querySelector('#pickerResults').classList.remove('open')}
 document.querySelectorAll('.catbtn').forEach(b=>b.onclick=()=>{newCategory=b.dataset.cat;document.querySelectorAll('.catbtn').forEach(x=>x.classList.toggle('active',x===b));const isP=newCategory==='pokemon';document.querySelector('#pokemonFields').hidden=!isP;document.querySelector('#genericFields').hidden=isP;document.querySelector('#dexToggleWrap').hidden=!isP});document.querySelector('#pokemonPicker').addEventListener('input',e=>{newPokemonId=null;const q=norm(e.target.value),box=document.querySelector('#pickerResults');box.innerHTML='';if(!q){box.classList.remove('open');return}const hits=pokedex.filter(p=>norm(p.name).includes(q)||norm(p.en).includes(q)||String(p.id).startsWith(q.replace('#',''))).slice(0,12);for(const p of hits){const d=document.createElement('div');d.className='pickrow';d.innerHTML=`<strong>${escapeHtml(p.name)}</strong> <small>${dex(p.id)}</small>`;d.onclick=()=>selectPokemon(p.id);box.appendChild(d)}box.classList.toggle('open',!!hits.length)});document.querySelector('#qtyMinus').onclick=()=>{newQty=Math.max(1,newQty-1);document.querySelector('#qtyValue').textContent=newQty};document.querySelector('#qtyPlus').onclick=()=>{newQty++;document.querySelector('#qtyValue').textContent=newQty};document.querySelector('#newTradeMinus').onclick=()=>{newTradeFrom=Math.max(2,newTradeFrom-1);document.querySelector('#newTradeValue').textContent=newTradeFrom;document.querySelector('#newTradeHint').textContent=tradeHint(newTradeFrom)};document.querySelector('#newTradePlus').onclick=()=>{newTradeFrom=Math.min(99,newTradeFrom+1);document.querySelector('#newTradeValue').textContent=newTradeFrom;document.querySelector('#newTradeHint').textContent=tradeHint(newTradeFrom)};
+
+async function blobToBitmap(input){
+  if('createImageBitmap' in window){
+    try{return await createImageBitmap(input)}catch{}
+  }
+  const url=URL.createObjectURL(input);
+  try{
+    const img=await new Promise((res,rej)=>{const i=new Image();i.onload=()=>res(i);i.onerror=()=>rej(new Error('Bild konnte nicht geladen werden'));i.src=url});
+    const c=document.createElement('canvas');c.width=img.naturalWidth||img.width;c.height=img.naturalHeight||img.height;c.getContext('2d').drawImage(img,0,0);
+    return c;
+  }finally{URL.revokeObjectURL(url)}
+}
+function closeBitmapLike(obj){try{obj?.close?.()}catch{}}
+function bitmapDims(obj){return{width:obj.width||obj.naturalWidth||obj.videoWidth||0,height:obj.height||obj.naturalHeight||obj.videoHeight||0}}
+function drawBitmapToCanvas(obj,w=null,h=null){const d=bitmapDims(obj),c=document.createElement('canvas');c.width=w||d.width;c.height=h||d.height;c.getContext('2d').drawImage(obj,0,0,c.width,c.height);return c}
+function distance(a,b){return Math.hypot(a.x-b.x,a.y-b.y)}
+function quadArea(q){let s=0;for(let i=0;i<q.length;i++){const p=q[i],n=q[(i+1)%q.length];s+=p.x*n.y-n.x*p.y}return Math.abs(s)/2}
+function orderQuad(pts){
+  const c=pts.reduce((s,p)=>({x:s.x+p.x,y:s.y+p.y}),{x:0,y:0});c.x/=pts.length;c.y/=pts.length;
+  const sorted=[...pts].sort((a,b)=>Math.atan2(a.y-c.y,a.x-c.x)-Math.atan2(b.y-c.y,b.x-c.x));
+  let topLeftIndex=0,best=Infinity;
+  sorted.forEach((p,i)=>{const v=p.x+p.y;if(v<best){best=v;topLeftIndex=i}});
+  const ordered=[sorted[topLeftIndex],sorted[(topLeftIndex+1)%4],sorted[(topLeftIndex+2)%4],sorted[(topLeftIndex+3)%4]];
+  const cross=(ordered[1].x-ordered[0].x)*(ordered[2].y-ordered[1].y)-(ordered[1].y-ordered[0].y)*(ordered[2].x-ordered[1].x);
+  if(cross<0)return [ordered[0],ordered[3],ordered[2],ordered[1]];
+  return ordered;
+}
+function fitLine(points){
+  let mx=0,my=0;for(const p of points){mx+=p.x;my+=p.y}mx/=points.length;my/=points.length;
+  let sxx=0,syy=0,sxy=0;for(const p of points){const dx=p.x-mx,dy=p.y-my;sxx+=dx*dx;syy+=dy*dy;sxy+=dx*dy}
+  const theta=.5*Math.atan2(2*sxy,sxx-syy);
+  const dx=Math.cos(theta),dy=Math.sin(theta),len=Math.hypot(dx,dy)||1;
+  const a=-dy/len,b=dx/len,c=-(a*mx+b*my);
+  return {a,b,c};
+}
+function intersectLines(l1,l2){const d=l1.a*l2.b-l2.a*l1.b;if(Math.abs(d)<1e-6)return null;return{x:(l1.b*l2.c-l2.b*l1.c)/d,y:(l1.c*l2.a-l2.c*l1.a)/d}}
+function percentile(values,p){if(!values.length)return 0;const arr=[...values].sort((a,b)=>a-b),idx=(arr.length-1)*p,lo=Math.floor(idx),hi=Math.ceil(idx),mix=idx-lo;return arr[lo]*(1-mix)+arr[hi]*mix}
+function refinePoints(points,axis){
+  if(points.length<8)return points;
+  const key=axis==='x'?'x':'y';
+  const vals=points.map(p=>p[key]);
+  const lo=percentile(vals,.12),hi=percentile(vals,.88);
+  let filtered=points.filter(p=>p[key]>=lo&&p[key]<=hi);
+  if(filtered.length<6)filtered=points;
+  const avgOther=filtered.reduce((s,p)=>s+(key==='x'?p.y:p.x),0)/filtered.length;
+  const spread=Math.max(12,(key==='x'?Math.abs(filtered[filtered.length-1].y-filtered[0].y):Math.abs(filtered[filtered.length-1].x-filtered[0].x))*0.45);
+  filtered=filtered.filter(p=>Math.abs((key==='x'?p.y:p.x)-avgOther)<=spread);
+  return filtered.length>=6?filtered:points;
+}
+function isValidQuad(q,w,h){
+  if(!q||q.length!==4)return false;
+  if(q.some(p=>!Number.isFinite(p.x)||!Number.isFinite(p.y)))return false;
+  const expanded=.18;
+  if(q.some(p=>p.x<-w*expanded||p.x>w*(1+expanded)||p.y<-h*expanded||p.y>h*(1+expanded)))return false;
+  const area=quadArea(q);if(area<w*h*.18)return false;
+  const top=distance(q[0],q[1]),right=distance(q[1],q[2]),bottom=distance(q[2],q[3]),left=distance(q[3],q[0]);
+  if(Math.min(top,right,bottom,left)<Math.min(w,h)*.18)return false;
+  const avgW=(top+bottom)/2,avgH=(left+right)/2,ratio=avgH/avgW;
+  if(ratio<1.1||ratio>1.7)return false;
+  return true;
+}
+function detectCardQuadFromCanvas(sourceCanvas){
+  const sw=sourceCanvas.width,sh=sourceCanvas.height,maxSide=520,scale=Math.min(1,maxSide/Math.max(sw,sh));
+  const w=Math.max(80,Math.round(sw*scale)),h=Math.max(80,Math.round(sh*scale));
+  const c=document.createElement('canvas');c.width=w;c.height=h;const ctx=c.getContext('2d',{willReadFrequently:true});ctx.drawImage(sourceCanvas,0,0,w,h);
+  const img=ctx.getImageData(0,0,w,h).data,size=w*h,gray=new Float32Array(size);
+  for(let i=0,j=0;i<size;i++,j+=4)gray[i]=img[j]*.299+img[j+1]*.587+img[j+2]*.114;
+  const blur=new Float32Array(size);
+  for(let y=1;y<h-1;y++)for(let x=1;x<w-1;x++){const i=y*w+x;blur[i]=(gray[i]*4+(gray[i-1]+gray[i+1]+gray[i-w]+gray[i+w])*2+(gray[i-w-1]+gray[i-w+1]+gray[i+w-1]+gray[i+w+1]))/16}
+  const gx=new Float32Array(size),gy=new Float32Array(size),sx=[],sy=[];
+  for(let y=1;y<h-1;y++)for(let x=1;x<w-1;x++){
+    const i=y*w+x;
+    const gxx=-blur[i-w-1]-2*blur[i-1]-blur[i+w-1]+blur[i-w+1]+2*blur[i+1]+blur[i+w+1];
+    const gyy=-blur[i-w-1]-2*blur[i-w]-blur[i-w+1]+blur[i+w-1]+2*blur[i+w]+blur[i+w+1];
+    const ax=Math.abs(gxx),ay=Math.abs(gyy);gx[i]=ax;gy[i]=ay;if((x+y)%3===0){sx.push(ax);sy.push(ay)}
+  }
+  const baseThx=Math.max(22,percentile(sx,.90)),baseThy=Math.max(22,percentile(sy,.90));
+  const scan=(tX,tY)=>{
+    const left=[],right=[],top=[],bottom=[];
+    const yStep=Math.max(2,Math.round(h/150)),xStep=Math.max(2,Math.round(w/150));
+    for(let y=Math.round(h*.08);y<Math.round(h*.92);y+=yStep){
+      for(let x=Math.round(w*.02);x<Math.round(w*.48);x++){
+        const i=y*w+x,v=gx[i];
+        if(v>tX&&v>=gx[i-1]&&v>=gx[i+1]){left.push({x,y});break}
+      }
+      for(let x=w-Math.round(w*.02)-1;x>Math.round(w*.52);x--){
+        const i=y*w+x,v=gx[i];
+        if(v>tX&&v>=gx[i-1]&&v>=gx[i+1]){right.push({x,y});break}
+      }
+    }
+    for(let x=Math.round(w*.08);x<Math.round(w*.92);x+=xStep){
+      for(let y=Math.round(h*.02);y<Math.round(h*.48);y++){
+        const i=y*w+x,v=gy[i];
+        if(v>tY&&v>=gy[i-w]&&v>=gy[i+w]){top.push({x,y});break}
+      }
+      for(let y=h-Math.round(h*.02)-1;y>Math.round(h*.52);y--){
+        const i=y*w+x,v=gy[i];
+        if(v>tY&&v>=gy[i-w]&&v>=gy[i+w]){bottom.push({x,y});break}
+      }
+    }
+    return {left,right,top,bottom};
+  };
+  let groups=scan(baseThx,baseThy);
+  if(groups.left.length<12||groups.right.length<12||groups.top.length<12||groups.bottom.length<12)groups=scan(baseThx*.78,baseThy*.78);
+  groups.left=refinePoints(groups.left,'x');groups.right=refinePoints(groups.right,'x');groups.top=refinePoints(groups.top,'y');groups.bottom=refinePoints(groups.bottom,'y');
+  if(groups.left.length<6||groups.right.length<6||groups.top.length<6||groups.bottom.length<6)return null;
+  const lines={left:fitLine(groups.left),right:fitLine(groups.right),top:fitLine(groups.top),bottom:fitLine(groups.bottom)};
+  const quadSmall=[intersectLines(lines.top,lines.left),intersectLines(lines.top,lines.right),intersectLines(lines.bottom,lines.right),intersectLines(lines.bottom,lines.left)];
+  if(quadSmall.some(p=>!p))return null;
+  const quad=orderQuad(quadSmall.map(p=>({x:p.x/scale,y:p.y/scale})));
+  return isValidQuad(quad,sw,sh)?quad:null;
+}
+function solveLinearSystem(mat,vec){
+  const n=vec.length,A=mat.map((row,i)=>[...row,vec[i]]);
+  for(let col=0;col<n;col++){
+    let pivot=col;for(let r=col+1;r<n;r++)if(Math.abs(A[r][col])>Math.abs(A[pivot][col]))pivot=r;
+    if(Math.abs(A[pivot][col])<1e-10)return null;
+    if(pivot!==col){const tmp=A[col];A[col]=A[pivot];A[pivot]=tmp}
+    const div=A[col][col];for(let j=col;j<=n;j++)A[col][j]/=div;
+    for(let r=0;r<n;r++)if(r!==col){const factor=A[r][col];if(!factor)continue;for(let j=col;j<=n;j++)A[r][j]-=factor*A[col][j]}
+  }
+  return A.map(row=>row[n]);
+}
+function computeHomography(src,dst){
+  const A=[],b=[];
+  for(let i=0;i<4;i++){
+    const {x,y}=src[i],u=dst[i].x,v=dst[i].y;
+    A.push([x,y,1,0,0,0,-u*x,-u*y]);b.push(u);
+    A.push([0,0,0,x,y,1,-v*x,-v*y]);b.push(v);
+  }
+  const s=solveLinearSystem(A,b);if(!s)return null;return [s[0],s[1],s[2],s[3],s[4],s[5],s[6],s[7],1];
+}
+function warpQuadToBlob(sourceCanvas,quad,outW=756,outH=Math.round(756*88/63)){
+  const srcCtx=sourceCanvas.getContext('2d',{willReadFrequently:true}),src=srcCtx.getImageData(0,0,sourceCanvas.width,sourceCanvas.height),s=src.data,sw=sourceCanvas.width,sh=sourceCanvas.height;
+  const dstCanvas=document.createElement('canvas');dstCanvas.width=outW;dstCanvas.height=outH;const dstCtx=dstCanvas.getContext('2d');
+  const dstImg=dstCtx.createImageData(outW,outH),d=dstImg.data;
+  const H=computeHomography([{x:0,y:0},{x:outW-1,y:0},{x:outW-1,y:outH-1},{x:0,y:outH-1}],quad);
+  if(!H)throw new Error('Homographie fehlgeschlagen');
+  for(let y=0;y<outH;y++)for(let x=0;x<outW;x++){
+    const denom=H[6]*x+H[7]*y+H[8];if(Math.abs(denom)<1e-6)continue;
+    const sx=(H[0]*x+H[1]*y+H[2])/denom,sy=(H[3]*x+H[4]*y+H[5])/denom;
+    const di=(y*outW+x)*4;
+    if(sx<0||sy<0||sx>=sw-1||sy>=sh-1){d[di]=0;d[di+1]=0;d[di+2]=0;d[di+3]=255;continue}
+    const x0=Math.floor(sx),y0=Math.floor(sy),x1=Math.min(sw-1,x0+1),y1=Math.min(sh-1,y0+1),tx=sx-x0,ty=sy-y0;
+    const i00=(y0*sw+x0)*4,i10=(y0*sw+x1)*4,i01=(y1*sw+x0)*4,i11=(y1*sw+x1)*4;
+    for(let c=0;c<4;c++){
+      const v=(s[i00+c]*(1-tx)+s[i10+c]*tx)*(1-ty)+(s[i01+c]*(1-tx)+s[i11+c]*tx)*ty;
+      d[di+c]=Math.max(0,Math.min(255,Math.round(v)));
+    }
+  }
+  dstCtx.putImageData(dstImg,0,0);
+  return new Promise(res=>dstCanvas.toBlob(res,'image/jpeg',.9));
+}
 async function compressImage(file){
-  const bmp=await createImageBitmap(file),max=1600,scale=Math.min(1,max/Math.max(bmp.width,bmp.height));
-  const w=Math.round(bmp.width*scale),h=Math.round(bmp.height*scale),c=document.createElement('canvas');
-  c.width=w;c.height=h;c.getContext('2d').drawImage(bmp,0,0,w,h);bmp.close();
-  return await new Promise(res=>c.toBlob(res,'image/jpeg',.84));
+  const bmp=await blobToBitmap(file),d=bitmapDims(bmp),max=1600,scale=Math.min(1,max/Math.max(d.width,d.height));
+  const w=Math.round(d.width*scale),h=Math.round(d.height*scale),c=drawBitmapToCanvas(bmp,w,h);closeBitmapLike(bmp);
+  return await new Promise(res=>c.toBlob(res,'image/jpeg',.86));
+}
+async function autoPrepareCardBlob(input){
+  const compressed=await compressImage(input),bmp=await blobToBitmap(compressed);
+  try{
+    const sourceCanvas=drawBitmapToCanvas(bmp),quad=detectCardQuadFromCanvas(sourceCanvas);
+    if(!quad)return compressed;
+    const warped=await warpQuadToBlob(sourceCanvas,quad);
+    return warped||compressed;
+  }finally{closeBitmapLike(bmp)}
 }
 function showPhotoPreview(blob){
   newPhotoBlob=blob;
   const u=URL.createObjectURL(blob),img=new Image();img.src=u;img.onload=()=>URL.revokeObjectURL(u);
   const box=document.querySelector('#photoPreview');box.innerHTML='';box.appendChild(img);
 }
-async function choosePhoto(file){if(!file)return;showPhotoPreview(await compressImage(file))}
+async function choosePhoto(file){if(!file)return;showPhotoPreview(await autoPrepareCardBlob(file))}
 
 let cameraStream=null,cameraFacing='environment',cameraTorchWanted=false,cameraTorchAvailable=false,pendingCameraBlob=null,pendingCameraUrl=null;
 function stopCamera(resetTorch=false){
@@ -202,11 +363,13 @@ async function captureGuideArea(){
   let sx=(gr.left-vr.left-offsetX)/scale,sy=(gr.top-vr.top-offsetY)/scale,sw=gr.width/scale,sh=gr.height/scale;
   sx=Math.max(0,Math.min(video.videoWidth-1,sx));sy=Math.max(0,Math.min(video.videoHeight-1,sy));
   sw=Math.min(sw,video.videoWidth-sx);sh=Math.min(sh,video.videoHeight-sy);
-  const canvas=document.createElement('canvas'),targetW=756,targetH=Math.round(targetW*88/63);
+  const canvas=document.createElement('canvas'),targetW=900,targetH=Math.round(targetW*88/63);
   canvas.width=targetW;canvas.height=targetH;
   canvas.getContext('2d').drawImage(video,sx,sy,sw,sh,0,0,targetW,targetH);
-  const blob=await new Promise(res=>canvas.toBlob(res,'image/jpeg',.88));
-  if(blob)showCameraReview(blob);
+  const rawBlob=await new Promise(res=>canvas.toBlob(res,'image/jpeg',.9));
+  if(!rawBlob)return;
+  const processed=await autoPrepareCardBlob(rawBlob);
+  showCameraReview(processed||rawBlob);
 }
 document.querySelector('#takePhoto').onclick=openInAppCamera;
 document.querySelector('#pickPhoto').onclick=()=>document.querySelector('#galleryInput').click();
@@ -239,7 +402,7 @@ document.addEventListener('visibilitychange',()=>{if(document.hidden&&document.q
 document.querySelector('#saveCard').onclick=async()=>{if(!newPhotoBlob){alert('Bitte zuerst ein Foto auswählen.');return}let name='',pokemonId=null;if(newCategory==='pokemon'){if(!newPokemonId){alert('Bitte ein Pokémon auswählen.');return}pokemonId=newPokemonId;name=pokeById(pokemonId)?.name||'Pokémon'}else{name=document.querySelector('#genericName').value.trim();if(!name){alert('Bitte einen Kartennamen eingeben.');return}}const c={id:crypto.randomUUID(),category:newCategory,pokemonId,name,image:newPhotoBlob,quantity:newQty,tradeFrom:newTradeFrom,note:document.querySelector('#newNote').value.trim(),addedAt:Date.now()};await txPut('cards',c);if(newCategory==='pokemon'&&document.querySelector('#useForDex').checked)await setDexCard(pokemonId,c.id);document.querySelector('#addModal').classList.remove('open');await reloadData()};
 async function openDetail(id){const c=cardById(id);if(!c)return;detailCardId=id;const p=c.category==='pokemon'?pokeById(c.pokemonId):null;document.querySelector('#detailName').textContent=p?.name||c.name;document.querySelector('#detailSub').textContent=c.category==='pokemon'?(p?dex(p.id):'Pokémon'):(c.category==='trainer'?'Trainer':'Energie');document.querySelector('#detailQty').textContent=Number(c.quantity)||1;document.querySelector('#detailTradeValue').textContent=tradeFrom(c);document.querySelector('#detailTradeHint').textContent=tradeHint(tradeFrom(c));document.querySelector('#detailNote').value=c.note||'';const u=URL.createObjectURL(c.image);document.querySelector('#detailImg').src=u;document.querySelector('#detailImg').onload=()=>URL.revokeObjectURL(u);const dexBtn=document.querySelector('#setDexBtn');if(c.category==='pokemon'){dexBtn.hidden=false;dexBtn.textContent=dexMap[c.pokemonId]===c.id?'Ist Pokédex-Karte ✓':'Als Pokédex-Karte'}else dexBtn.hidden=true;document.querySelector('#detailModal').classList.add('open')}function currentDetail(){return cardById(detailCardId)}document.querySelector('#detailMinus').onclick=()=>{const c=currentDetail();if(!c)return;c.quantity=Math.max(1,(Number(c.quantity)||1)-1);document.querySelector('#detailQty').textContent=c.quantity};document.querySelector('#detailPlus').onclick=()=>{const c=currentDetail();if(!c)return;c.quantity=(Number(c.quantity)||1)+1;document.querySelector('#detailQty').textContent=c.quantity};document.querySelector('#detailTradeMinus').onclick=()=>{const c=currentDetail();if(!c)return;c.tradeFrom=Math.max(2,tradeFrom(c)-1);document.querySelector('#detailTradeValue').textContent=c.tradeFrom;document.querySelector('#detailTradeHint').textContent=tradeHint(c.tradeFrom)};document.querySelector('#detailTradePlus').onclick=()=>{const c=currentDetail();if(!c)return;c.tradeFrom=Math.min(99,tradeFrom(c)+1);document.querySelector('#detailTradeValue').textContent=c.tradeFrom;document.querySelector('#detailTradeHint').textContent=tradeHint(c.tradeFrom)};document.querySelector('#saveDetail').onclick=async()=>{const c=currentDetail();if(!c)return;c.note=document.querySelector('#detailNote').value;c.quantity=Number(document.querySelector('#detailQty').textContent)||1;c.tradeFrom=Math.max(2,Math.min(99,Number(document.querySelector('#detailTradeValue').textContent)||5));await txPut('cards',c);document.querySelector('#detailModal').classList.remove('open');await reloadData()};document.querySelector('#setDexBtn').onclick=async()=>{const c=currentDetail();if(!c||c.category!=='pokemon')return;await setDexCard(c.pokemonId,c.id);document.querySelector('#setDexBtn').textContent='Ist Pokédex-Karte ✓';await reloadData()};document.querySelector('#deleteCard').onclick=async()=>{const c=currentDetail();if(!c||!confirm('Diese Karte wirklich löschen?'))return;await clearDexIfCard(c);await txDel('cards',c.id);document.querySelector('#detailModal').classList.remove('open');await reloadData()};
 document.querySelector('#fab').onclick=openAdd;document.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>document.querySelector('#'+b.dataset.close).classList.remove('open'));document.querySelectorAll('.overlay').forEach(o=>o.addEventListener('click',e=>{if(e.target===o)o.classList.remove('open')}));
-async function blobToDataURL(blob){return await new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result);r.onerror=()=>rej(r.error);r.readAsDataURL(blob)})}async function dataURLToBlob(s){const r=await fetch(s);return await r.blob()}document.querySelector('#exportBtn').onclick=async()=>{const packed=[];for(const c of cards)packed.push({...c,image:await blobToDataURL(c.image)});const payload={app:'KartenPokedex',version:3,appVersion:'3.4',exportedAt:new Date().toISOString(),cards:packed,dexMap},blob=new Blob([JSON.stringify(payload)],{type:'application/json'}),a=document.createElement('a'),count=cards.reduce((s,c)=>s+(Number(c.quantity)||1),0);a.href=URL.createObjectURL(blob);a.download=`KartenPokedex_${count}-Karten_${new Date().toISOString().slice(0,10)}.json`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1200)};document.querySelector('#importBtn').onclick=()=>document.querySelector('#importInput').click();document.querySelector('#importInput').onchange=async e=>{try{const file=e.target.files?.[0];if(!file)return;const d=JSON.parse(await file.text());if(d.version!==3||!Array.isArray(d.cards)){alert('Dieses Backup gehört nicht zur Version 3.');return}if(!confirm(`${d.cards.length} Karteneinträge importieren? Vorhandene Daten werden ersetzt.`))return;await txClear('cards');await txClear('meta');const legacyTradeFrom=Number.isFinite(Number(d.keepCount))?Math.max(2,Math.min(99,Math.floor(Number(d.keepCount))+1)):5;for(const c of d.cards){const tf=Number.isFinite(Number(c.tradeFrom))?Math.max(2,Math.min(99,Math.floor(Number(c.tradeFrom)))):legacyTradeFrom;await txPut('cards',{...c,tradeFrom:tf,image:await dataURLToBlob(c.image)})}for(const[pid,cid]of Object.entries(d.dexMap||{}))await txPut('meta',{key:'dex:'+pid,value:cid});await reloadData();alert('Backup importiert.')}catch(err){alert('Import fehlgeschlagen: '+err.message)}e.target.value=''};
+async function blobToDataURL(blob){return await new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result);r.onerror=()=>rej(r.error);r.readAsDataURL(blob)})}async function dataURLToBlob(s){const r=await fetch(s);return await r.blob()}document.querySelector('#exportBtn').onclick=async()=>{const packed=[];for(const c of cards)packed.push({...c,image:await blobToDataURL(c.image)});const payload={app:'KartenPokedex',version:3,appVersion:'3.5',exportedAt:new Date().toISOString(),cards:packed,dexMap},blob=new Blob([JSON.stringify(payload)],{type:'application/json'}),a=document.createElement('a'),count=cards.reduce((s,c)=>s+(Number(c.quantity)||1),0);a.href=URL.createObjectURL(blob);a.download=`KartenPokedex_${count}-Karten_${new Date().toISOString().slice(0,10)}.json`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1200)};document.querySelector('#importBtn').onclick=()=>document.querySelector('#importInput').click();document.querySelector('#importInput').onchange=async e=>{try{const file=e.target.files?.[0];if(!file)return;const d=JSON.parse(await file.text());if(d.version!==3||!Array.isArray(d.cards)){alert('Dieses Backup gehört nicht zur Version 3.');return}if(!confirm(`${d.cards.length} Karteneinträge importieren? Vorhandene Daten werden ersetzt.`))return;await txClear('cards');await txClear('meta');const legacyTradeFrom=Number.isFinite(Number(d.keepCount))?Math.max(2,Math.min(99,Math.floor(Number(d.keepCount))+1)):5;for(const c of d.cards){const tf=Number.isFinite(Number(c.tradeFrom))?Math.max(2,Math.min(99,Math.floor(Number(c.tradeFrom)))):legacyTradeFrom;await txPut('cards',{...c,tradeFrom:tf,image:await dataURLToBlob(c.image)})}for(const[pid,cid]of Object.entries(d.dexMap||{}))await txPut('meta',{key:'dex:'+pid,value:cid});await reloadData();alert('Backup importiert.')}catch(err){alert('Import fehlgeschlagen: '+err.message)}e.target.value=''};
 document.querySelector('#menuBtn').onclick=()=>document.querySelector('#tools').classList.toggle('open');function isStandalone(){return matchMedia('(display-mode: standalone)').matches||navigator.standalone===true}function updateInstall(){const b=document.querySelector('#installBtn');if(isStandalone()){b.classList.add('installed');b.textContent='✓'}else{b.classList.remove('installed');b.textContent='↓'}}window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferredInstallPrompt=e;updateInstall()});window.addEventListener('appinstalled',()=>{deferredInstallPrompt=null;updateInstall()});document.querySelector('#installBtn').onclick=async()=>{if(isStandalone()){alert('Die App ist bereits installiert.');return}if(deferredInstallPrompt){deferredInstallPrompt.prompt();try{await deferredInstallPrompt.userChoice}catch{}deferredInstallPrompt=null}else alert('Öffne die Seite in Chrome und wähle im Browser-Menü „App installieren“ bzw. „Zum Startbildschirm hinzufügen“.')};updateInstall();
 (async()=>{try{await Promise.all([loadDex(),openDB()]);await reloadData();document.querySelector('#status').hidden=true;document.querySelector('#grid').hidden=false;if('serviceWorker'in navigator&&location.protocol!=='file:')navigator.serviceWorker.register('./sw.js').catch(()=>{})}catch(e){document.querySelector('#status').innerHTML=`App konnte nicht geladen werden.<br><span style="font-size:12px">${escapeHtml(e.message||e)}</span>`}})();
 </script></body></html>

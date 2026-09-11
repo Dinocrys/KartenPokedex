@@ -1,15 +1,11 @@
-# KartenPokédex v3.4
+# KartenPokédex v3.5
 
-Änderungen:
-- In-App-Kamera startet standardmäßig mit der Rückkamera.
-- Kamera kann weiterhin zwischen Vorder- und Rückkamera gewechselt werden.
-- Kartenrahmen als Aufnahmehilfe; gespeichert wird der Bereich innerhalb des Rahmens.
-- Licht-/Torch-Schalter wird automatisch eingeblendet, wenn das Gerät und der Browser ihn unterstützen.
-- Nach der Aufnahme erscheint jetzt eine Vorschau mit „Neu aufnehmen“ und „Übernehmen“.
-- Kamera-Hinweis für vollständige Karte und möglichst wenig Schatten.
-- Bestehende Sammlung, Pokédex-Zuordnungen und individuelle „Tauschbar ab“-Werte bleiben erhalten.
-- Backup-Version auf v3.4 aktualisiert; v3-Backups bleiben importierbar.
+Neu in v3.5:
 
-Hinweis: Die automatische Kantenerkennung, Perspektivkorrektur und das automatische Geradestellen sind noch nicht Bestandteil von v3.4. Das ist für den nächsten Schritt vorgesehen.
-
-Zum Update alle Dateien aus dieser ZIP in das bestehende GitHub-Repository hochladen und ersetzen.
+- Automatische Kartenerkennung nach der Aufnahme oder beim Import aus der Galerie.
+- Automatisches Geradestellen der Karte, wenn sie leicht schief fotografiert wurde.
+- Perspektivkorrektur, damit schräg fotografierte Karten wieder möglichst gerade erscheinen.
+- Automatischer Zuschnitt auf das Kartenformat.
+- Wenn keine Karte sicher erkannt wird, bleibt das Bild als Fallback erhalten.
+- Bestehende Sammlungsdaten und „Tauschbar ab“-Einstellungen bleiben erhalten.
+- Backup-Import/Export bleibt zu Version 3 kompatibel.
