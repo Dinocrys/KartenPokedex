@@ -1,14 +1,15 @@
-# KartenPokédex v3.3
+# KartenPokédex v3.4
 
 Änderungen:
-- Pokédex zeigt nur noch: Alle / Gesammelt / Fehlt.
-- Alle Karten zeigt: Alle / Pokémon / Trainer / Energie / Tauschbar.
-- „Tauschbar“ wird jetzt **für jede Karte einzeln** eingestellt.
-- Beim Anlegen und in den Kartendetails gibt es „Tauschbar ab“.
-- Standard ist „ab dem 5. Exemplar“, kann aber pro Karte frei von 2 bis 99 geändert werden.
-- Beispiel: Menge 7, „Tauschbar ab 5“ = 3 Karten tauschbar.
-- Bestehende v3.2-Daten werden automatisch übernommen: die bisherige globale Einstellung wird einmalig als Startwert auf vorhandene Karten übertragen.
-- Alte v3-Backups bleiben importierbar.
-- Kamera-Funktionen bleiben erhalten.
+- In-App-Kamera startet standardmäßig mit der Rückkamera.
+- Kamera kann weiterhin zwischen Vorder- und Rückkamera gewechselt werden.
+- Kartenrahmen als Aufnahmehilfe; gespeichert wird der Bereich innerhalb des Rahmens.
+- Licht-/Torch-Schalter wird automatisch eingeblendet, wenn das Gerät und der Browser ihn unterstützen.
+- Nach der Aufnahme erscheint jetzt eine Vorschau mit „Neu aufnehmen“ und „Übernehmen“.
+- Kamera-Hinweis für vollständige Karte und möglichst wenig Schatten.
+- Bestehende Sammlung, Pokédex-Zuordnungen und individuelle „Tauschbar ab“-Werte bleiben erhalten.
+- Backup-Version auf v3.4 aktualisiert; v3-Backups bleiben importierbar.
+
+Hinweis: Die automatische Kantenerkennung, Perspektivkorrektur und das automatische Geradestellen sind noch nicht Bestandteil von v3.4. Das ist für den nächsten Schritt vorgesehen.
 
 Zum Update alle Dateien aus dieser ZIP in das bestehende GitHub-Repository hochladen und ersetzen.
