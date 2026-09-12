@@ -64,7 +64,7 @@
 <body>
 <div class="app">
   <header>
-    <div class="titlebar"><div class="ball"></div><div style="min-width:0;flex:1"><h1>Mein Karten-Pokédex</h1><div class="subtitle">Pokédex & Kartensammlung · v3.11</div></div><button id="installBtn" class="headbtn" title="App installieren">↓</button><button id="menuBtn" class="headbtn" title="Menü">☰</button></div>
+    <div class="titlebar"><div class="ball"></div><div style="min-width:0;flex:1"><h1>Mein Karten-Pokédex</h1><div class="subtitle">Pokédex & Kartensammlung · v3.12</div></div><button id="installBtn" class="headbtn" title="App installieren">↓</button><button id="menuBtn" class="headbtn" title="Menü">☰</button></div>
     <div class="tabbar"><button class="tab active" data-tab="dex">Pokédex</button><button class="tab" data-tab="cards">Alle Karten</button></div>
     <div class="stats" id="stats"><div class="statrow"><span><strong id="collected">0</strong> gesammelt</span><span><strong id="total">1025</strong> Pokémon</span><span id="pct">0 %</span></div><div class="progress"><div id="bar"></div></div></div>
   </header>
@@ -335,17 +335,39 @@ async function getOcrWorker(){
   })().catch(err=>{ocrWorkerPromise=null;throw err});
   return ocrWorkerPromise;
 }
-async function makeNameOcrCanvas(blob){
+function nameOcrRegionCanvas(bmp,region,mode='contrast'){
+  const d=bitmapDims(bmp),sx=Math.max(0,Math.round(d.width*region.x)),sy=Math.max(0,Math.round(d.height*region.y)),sw=Math.max(2,Math.round(d.width*region.w)),sh=Math.max(2,Math.round(d.height*region.h));
+  const targetW=Math.min(1700,Math.max(1050,Math.round(sw*2.7))),targetH=Math.max(150,Math.round(targetW*(sh/sw)));
+  const c=document.createElement('canvas');c.width=targetW;c.height=targetH;const ctx=c.getContext('2d',{willReadFrequently:true});
+  ctx.fillStyle='#fff';ctx.fillRect(0,0,targetW,targetH);ctx.drawImage(bmp,sx,sy,sw,sh,0,0,targetW,targetH);
+  const im=ctx.getImageData(0,0,targetW,targetH),a=im.data,gray=[];
+  for(let i=0;i<a.length;i+=4){const g=a[i]*.299+a[i+1]*.587+a[i+2]*.114;gray.push(g)}
+  const lo=percentile(gray,.04),hi=percentile(gray,.96),span=Math.max(24,hi-lo);
+  let threshold=0;
+  if(mode==='binary'){
+    const hist=new Array(256).fill(0);for(const g of gray)hist[Math.max(0,Math.min(255,Math.round(g)))]++;
+    let total=gray.length,sum=0;for(let i=0;i<256;i++)sum+=i*hist[i];
+    let sumB=0,wB=0,best=-1;for(let i=0;i<256;i++){wB+=hist[i];if(!wB)continue;const wF=total-wB;if(!wF)break;sumB+=i*hist[i];const mB=sumB/wB,mF=(sum-sumB)/wF,v=wB*wF*(mB-mF)*(mB-mF);if(v>best){best=v;threshold=i}}
+    threshold=Math.max(80,Math.min(210,threshold));
+  }
+  for(let i=0,j=0;i<a.length;i+=4,j++){
+    let g=(gray[j]-lo)*255/span;g=Math.max(0,Math.min(255,g));
+    if(mode==='binary')g=g<threshold?0:255;
+    else g=(g-128)*1.35+128;
+    g=Math.max(0,Math.min(255,g));a[i]=a[i+1]=a[i+2]=g;a[i+3]=255;
+  }
+  ctx.putImageData(im,0,0);return c;
+}
+async function makeNameOcrCanvases(blob){
   const bmp=await blobToBitmap(blob);
   try{
-    const d=bitmapDims(bmp),sx=Math.round(d.width*.045),sy=Math.round(d.height*.025),sw=Math.round(d.width*.78),sh=Math.round(d.height*.145);
-    const targetW=Math.min(1800,Math.max(900,Math.round(sw*2.4))),targetH=Math.max(120,Math.round(targetW*(sh/sw)));
-    const c=document.createElement('canvas');c.width=targetW;c.height=targetH;const ctx=c.getContext('2d',{willReadFrequently:true});
-    ctx.drawImage(bmp,sx,sy,sw,sh,0,0,targetW,targetH);
-    const im=ctx.getImageData(0,0,targetW,targetH),a=im.data;
-    let avg=0;for(let i=0;i<a.length;i+=4){const g=a[i]*.299+a[i+1]*.587+a[i+2]*.114;avg+=g;a[i]=a[i+1]=a[i+2]=g}avg/=a.length/4;
-    const contrast=1.55;for(let i=0;i<a.length;i+=4){let g=(a[i]-avg)*contrast+avg;g=Math.max(0,Math.min(255,g));a[i]=a[i+1]=a[i+2]=g}
-    ctx.putImageData(im,0,0);return c;
+    // Die Pokémon-Namen sitzen bei fast allen Kartendesigns links oben. Mehrere enge
+    // Ausschnitte sind zuverlässiger als der frühere große Bereich mit KP/Level-Zeilen.
+    return [
+      {canvas:nameOcrRegionCanvas(bmp,{x:.018,y:.010,w:.64,h:.088},'binary'),psm:'7',label:'Titel'},
+      {canvas:nameOcrRegionCanvas(bmp,{x:.015,y:.004,w:.72,h:.112},'contrast'),psm:'7',label:'Titel erweitert'},
+      {canvas:nameOcrRegionCanvas(bmp,{x:.010,y:.000,w:.80,h:.145},'binary'),psm:'6',label:'Kopfbereich'}
+    ];
   }finally{closeBitmapLike(bmp)}
 }
 function levenshtein(a,b){
@@ -357,37 +379,51 @@ function levenshtein(a,b){
 function ocrNameNorm(s){return norm(s).replace(/[^a-z0-9]+/g,' ').replace(/\s+/g,' ').trim()}
 function bestPokemonFromOcr(rawText){
   const text=ocrNameNorm(rawText);if(!text)return null;
-  const tokens=text.split(' ').filter(Boolean).slice(0,12),phrases=[];
+  const tokens=text.split(' ').filter(Boolean).slice(0,18),phrases=[];
   for(let i=0;i<tokens.length;i++)for(let n=1;n<=3&&i+n<=tokens.length;n++)phrases.push(tokens.slice(i,i+n).join(' '));
   let best=null,second=null;
   for(const p of pokedex){
-    const variants=[p.name,p.en].map(ocrNameNorm).filter(Boolean);
-    let pBest=0;
+    const variants=[p.name,p.en].map(ocrNameNorm).filter(Boolean);let pBest=0;
     for(const candidate of variants){
+      if(text===candidate||text.startsWith(candidate+' ')||text.includes(' '+candidate+' '))pBest=Math.max(pBest,.995);
       for(const phrase of phrases){
         const maxLen=Math.max(candidate.length,phrase.length);if(!maxLen)continue;
-        const sim=1-levenshtein(candidate,phrase)/maxLen;
+        let sim=1-levenshtein(candidate,phrase)/maxLen;
+        // OCR verwechselt bei Kartenschriften besonders oft I/l/1 sowie O/0.
+        const compactCandidate=candidate.replace(/ /g,''),compactPhrase=phrase.replace(/ /g,'');
+        if(compactCandidate.length>=4&&compactPhrase.length>=3){
+          const a=compactCandidate.replace(/1/g,'l').replace(/0/g,'o'),b=compactPhrase.replace(/1/g,'l').replace(/0/g,'o');
+          sim=Math.max(sim,1-levenshtein(a,b)/Math.max(a.length,b.length));
+        }
         if(sim>pBest)pBest=sim;
       }
     }
-    const item={pokemon:p,score:pBest};
-    if(!best||item.score>best.score){second=best;best=item}else if(!second||item.score>second.score)second=item;
+    const item={pokemon:p,score:pBest};if(!best||item.score>best.score){second=best;best=item}else if(!second||item.score>second.score)second=item;
   }
   if(!best)return null;
-  const nlen=ocrNameNorm(best.pokemon.name).replace(/ /g,'').length,threshold=nlen<=4?.88:nlen<=6?.78:.72,margin=best.score-(second?.score||0);
+  const nlen=ocrNameNorm(best.pokemon.name).replace(/ /g,'').length,threshold=nlen<=4?.79:nlen<=6?.70:.64,margin=best.score-(second?.score||0);
   if(best.score<threshold)return null;
-  if(best.score<.93&&margin<.055)return null;
+  if(best.score<.82&&margin<.045)return null;
   return{...best,raw:rawText,margin};
 }
 async function recognizePokemonName(blob){
   if(!blob||newCategory!=='pokemon'||pokemonManuallyChosen)return;
   const token=++ocrRunToken;setOcrStatus('Name wird automatisch erkannt …','working');
   try{
-    const [worker,canvas]=await Promise.all([getOcrWorker(),makeNameOcrCanvas(blob)]);
+    const [worker,passes]=await Promise.all([getOcrWorker(),makeNameOcrCanvases(blob)]);
     if(token!==ocrRunToken||newCategory!=='pokemon'||pokemonManuallyChosen)return;
-    const result=await worker.recognize(canvas),match=bestPokemonFromOcr(result?.data?.text||'');
+    let best=null,raw=[];
+    for(let i=0;i<passes.length;i++){
+      if(token!==ocrRunToken||newCategory!=='pokemon'||pokemonManuallyChosen)return;
+      const pass=passes[i];setOcrStatus(`Name wird erkannt … Versuch ${i+1}/${passes.length}`,'working');
+      try{await worker.setParameters({tessedit_pageseg_mode:pass.psm,preserve_interword_spaces:'1',tessedit_char_whitelist:"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-.' :"});}catch{}
+      const result=await worker.recognize(pass.canvas),txt=result?.data?.text||'';raw.push(txt);
+      const match=bestPokemonFromOcr(txt);if(match&&(!best||match.score>best.score))best=match;
+      if(best&&best.score>=.90)break;
+    }
     if(token!==ocrRunToken||newCategory!=='pokemon'||pokemonManuallyChosen)return;
-    if(match){selectPokemon(match.pokemon.id,'ocr');setOcrStatus(`Automatisch erkannt: ${match.pokemon.name} · bitte kurz prüfen.`,'ok')}
+    console.debug('Pokémon-OCR:',raw);
+    if(best){selectPokemon(best.pokemon.id,'ocr');setOcrStatus(`Automatisch erkannt: ${best.pokemon.name} · bitte kurz prüfen.`,'ok')}
     else setOcrStatus('Name nicht sicher erkannt – bitte manuell auswählen.','warn');
   }catch(err){
     if(token!==ocrRunToken)return;console.warn('Namens-Erkennung nicht verfügbar:',err);setOcrStatus('Namens-Erkennung nicht verfügbar – bitte manuell auswählen.','warn');
@@ -539,7 +575,7 @@ document.querySelector('#saveCard').onclick=async()=>{
 };
 async function openDetail(id){const c=cardById(id);if(!c)return;detailCardId=id;const p=c.category==='pokemon'?pokeById(c.pokemonId):null;document.querySelector('#detailName').textContent=p?.name||c.name;document.querySelector('#detailSub').textContent=c.category==='pokemon'?(p?dex(p.id):'Pokémon'):(c.category==='trainer'?'Trainer':'Energie');document.querySelector('#detailQty').textContent=Number(c.quantity)||1;document.querySelector('#detailTradeValue').textContent=tradeFrom(c);document.querySelector('#detailTradeHint').textContent=tradeHint(tradeFrom(c));document.querySelector('#detailNote').value=c.note||'';const u=URL.createObjectURL(c.image);document.querySelector('#detailImg').src=u;document.querySelector('#detailImg').onload=()=>URL.revokeObjectURL(u);const dexBtn=document.querySelector('#setDexBtn');if(c.category==='pokemon'){dexBtn.hidden=false;dexBtn.textContent=dexMap[c.pokemonId]===c.id?'Ist Pokédex-Karte ✓':'Als Pokédex-Karte'}else dexBtn.hidden=true;document.querySelector('#detailModal').classList.add('open')}function currentDetail(){return cardById(detailCardId)}document.querySelector('#detailMinus').onclick=()=>{const c=currentDetail();if(!c)return;c.quantity=Math.max(1,(Number(c.quantity)||1)-1);document.querySelector('#detailQty').textContent=c.quantity};document.querySelector('#detailPlus').onclick=()=>{const c=currentDetail();if(!c)return;c.quantity=(Number(c.quantity)||1)+1;document.querySelector('#detailQty').textContent=c.quantity};document.querySelector('#detailTradeMinus').onclick=()=>{const c=currentDetail();if(!c)return;c.tradeFrom=Math.max(2,tradeFrom(c)-1);document.querySelector('#detailTradeValue').textContent=c.tradeFrom;document.querySelector('#detailTradeHint').textContent=tradeHint(c.tradeFrom)};document.querySelector('#detailTradePlus').onclick=()=>{const c=currentDetail();if(!c)return;c.tradeFrom=Math.min(99,tradeFrom(c)+1);document.querySelector('#detailTradeValue').textContent=c.tradeFrom;document.querySelector('#detailTradeHint').textContent=tradeHint(c.tradeFrom)};document.querySelector('#saveDetail').onclick=async()=>{const c=currentDetail();if(!c)return;c.note=document.querySelector('#detailNote').value;c.quantity=Number(document.querySelector('#detailQty').textContent)||1;c.tradeFrom=Math.max(2,Math.min(99,Number(document.querySelector('#detailTradeValue').textContent)||5));await txPut('cards',c);document.querySelector('#detailModal').classList.remove('open');await reloadData()};document.querySelector('#setDexBtn').onclick=async()=>{const c=currentDetail();if(!c||c.category!=='pokemon')return;await setDexCard(c.pokemonId,c.id);document.querySelector('#setDexBtn').textContent='Ist Pokédex-Karte ✓';await reloadData()};document.querySelector('#deleteCard').onclick=async()=>{const c=currentDetail();if(!c||!confirm('Diese Karte wirklich löschen?'))return;await clearDexIfCard(c);await txDel('cards',c.id);document.querySelector('#detailModal').classList.remove('open');await reloadData()};
 document.querySelector('#fab').onclick=openAdd;document.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>{const id=b.dataset.close;if(id==='addModal'){cancelBatch();pendingAddPokemonId=null}if(id==='modeModal')pendingAddPokemonId=null;document.querySelector('#'+id).classList.remove('open')});document.querySelectorAll('.overlay').forEach(o=>o.addEventListener('click',e=>{if(e.target===o&&!o.dataset.locked){if(o.id==='addModal'){cancelBatch();pendingAddPokemonId=null}if(o.id==='modeModal')pendingAddPokemonId=null;o.classList.remove('open')}}));
-async function blobToDataURL(blob){return await new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result);r.onerror=()=>rej(r.error);r.readAsDataURL(blob)})}async function dataURLToBlob(s){const r=await fetch(s);return await r.blob()}document.querySelector('#exportBtn').onclick=async()=>{const packed=[];for(const c of cards)packed.push({...c,image:await blobToDataURL(c.image)});const payload={app:'KartenPokedex',version:3,appVersion:'3.11',exportedAt:new Date().toISOString(),cards:packed,dexMap},blob=new Blob([JSON.stringify(payload)],{type:'application/json'}),a=document.createElement('a'),count=cards.reduce((s,c)=>s+(Number(c.quantity)||1),0);a.href=URL.createObjectURL(blob);a.download=`KartenPokedex_${count}-Karten_${new Date().toISOString().slice(0,10)}.json`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1200)};document.querySelector('#importBtn').onclick=()=>document.querySelector('#importInput').click();document.querySelector('#importInput').onchange=async e=>{try{const file=e.target.files?.[0];if(!file)return;const d=JSON.parse(await file.text());if(d.version!==3||!Array.isArray(d.cards)){alert('Dieses Backup gehört nicht zur Version 3.');return}if(!confirm(`${d.cards.length} Karteneinträge importieren? Vorhandene Daten werden ersetzt.`))return;await txClear('cards');await txClear('meta');const legacyTradeFrom=Number.isFinite(Number(d.keepCount))?Math.max(2,Math.min(99,Math.floor(Number(d.keepCount))+1)):5;for(const c of d.cards){const tf=Number.isFinite(Number(c.tradeFrom))?Math.max(2,Math.min(99,Math.floor(Number(c.tradeFrom)))):legacyTradeFrom;await txPut('cards',{...c,tradeFrom:tf,image:await dataURLToBlob(c.image)})}for(const[pid,cid]of Object.entries(d.dexMap||{}))await txPut('meta',{key:'dex:'+pid,value:cid});await reloadData();alert('Backup importiert.')}catch(err){alert('Import fehlgeschlagen: '+err.message)}e.target.value=''};
+async function blobToDataURL(blob){return await new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result);r.onerror=()=>rej(r.error);r.readAsDataURL(blob)})}async function dataURLToBlob(s){const r=await fetch(s);return await r.blob()}document.querySelector('#exportBtn').onclick=async()=>{const packed=[];for(const c of cards)packed.push({...c,image:await blobToDataURL(c.image)});const payload={app:'KartenPokedex',version:3,appVersion:'3.12',exportedAt:new Date().toISOString(),cards:packed,dexMap},blob=new Blob([JSON.stringify(payload)],{type:'application/json'}),a=document.createElement('a'),count=cards.reduce((s,c)=>s+(Number(c.quantity)||1),0);a.href=URL.createObjectURL(blob);a.download=`KartenPokedex_${count}-Karten_${new Date().toISOString().slice(0,10)}.json`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1200)};document.querySelector('#importBtn').onclick=()=>document.querySelector('#importInput').click();document.querySelector('#importInput').onchange=async e=>{try{const file=e.target.files?.[0];if(!file)return;const d=JSON.parse(await file.text());if(d.version!==3||!Array.isArray(d.cards)){alert('Dieses Backup gehört nicht zur Version 3.');return}if(!confirm(`${d.cards.length} Karteneinträge importieren? Vorhandene Daten werden ersetzt.`))return;await txClear('cards');await txClear('meta');const legacyTradeFrom=Number.isFinite(Number(d.keepCount))?Math.max(2,Math.min(99,Math.floor(Number(d.keepCount))+1)):5;for(const c of d.cards){const tf=Number.isFinite(Number(c.tradeFrom))?Math.max(2,Math.min(99,Math.floor(Number(c.tradeFrom)))):legacyTradeFrom;await txPut('cards',{...c,tradeFrom:tf,image:await dataURLToBlob(c.image)})}for(const[pid,cid]of Object.entries(d.dexMap||{}))await txPut('meta',{key:'dex:'+pid,value:cid});await reloadData();alert('Backup importiert.')}catch(err){alert('Import fehlgeschlagen: '+err.message)}e.target.value=''};
 document.querySelector('#menuBtn').onclick=()=>document.querySelector('#tools').classList.toggle('open');function isStandalone(){return matchMedia('(display-mode: standalone)').matches||navigator.standalone===true}function updateInstall(){const b=document.querySelector('#installBtn');if(isStandalone()){b.classList.add('installed');b.textContent='✓'}else{b.classList.remove('installed');b.textContent='↓'}}window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferredInstallPrompt=e;updateInstall()});window.addEventListener('appinstalled',()=>{deferredInstallPrompt=null;updateInstall()});document.querySelector('#installBtn').onclick=async()=>{if(isStandalone()){alert('Die App ist bereits installiert.');return}if(deferredInstallPrompt){deferredInstallPrompt.prompt();try{await deferredInstallPrompt.userChoice}catch{}deferredInstallPrompt=null}else alert('Öffne die Seite in Chrome und wähle im Browser-Menü „App installieren“ bzw. „Zum Startbildschirm hinzufügen“.')};updateInstall();
 (async()=>{try{await Promise.all([loadDex(),openDB()]);await reloadData();document.querySelector('#status').hidden=true;document.querySelector('#grid').hidden=false;if('serviceWorker'in navigator&&location.protocol!=='file:')navigator.serviceWorker.register('./sw.js').catch(()=>{})}catch(e){document.querySelector('#status').innerHTML=`App konnte nicht geladen werden.<br><span style="font-size:12px">${escapeHtml(e.message||e)}</span>`}})();
 </script></body></html>

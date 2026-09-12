@@ -1,11 +1,10 @@
-# KartenPokédex v3.11
+# KartenPokédex v3.12
 
-Neu in v3.11:
+Neu in v3.12:
 
-- Pokémon-Namen werden nach dem Zuschneiden des Fotos automatisch per OCR aus dem oberen Kartenbereich gelesen.
-- Das erkannte Wort wird mit den bekannten deutschen und englischen Pokémon-Namen abgeglichen; kleine OCR-Fehler können dadurch trotzdem zugeordnet werden.
-- Eine automatische Erkennung wird im Formular angezeigt und bleibt immer manuell korrigierbar.
-- Bei unsicherer oder fehlgeschlagener Erkennung wird nichts geraten; die App fordert zur manuellen Auswahl auf.
-- Eine Pokémon-Karte kann nicht ohne ausgewählten Namen gespeichert werden. Trainer- und Energiekarten benötigen ebenfalls weiterhin einen Kartennamen.
-- Die OCR wird erst bei Bedarf geladen. Beim ersten Einsatz ist daher eine Internetverbindung erforderlich; danach kann der Browser Bestandteile zwischenspeichern.
-- Alle Funktionen aus v3.10 bleiben erhalten.
+- Die automatische Pokémon-Namenerkennung wurde deutlich robuster gemacht.
+- Statt eines großen Kopfbereichs werden bis zu drei gezielte OCR-Ausschnitte des Namensfeldes geprüft.
+- Schwarz/Weiß- und Kontrast-Aufbereitung helfen bei Holo, älteren Karten und unterschiedlichen Kartenfarben.
+- Die Namenszuordnung toleriert typische OCR-Fehler wie I/l/1 und O/0 und gleicht weiter mit dem Pokédex ab.
+- Ohne ausgewählten Pokémon-Namen kann weiterhin nicht gespeichert werden.
+- Alle Funktionen aus v3.11 bleiben erhalten.
