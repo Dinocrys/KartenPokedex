@@ -1,6 +1,6 @@
-# KartenPokédex v3.17
+# KartenPokédex v3.18
 
-Neu in v3.17:
+Neu in v3.18:
 
 - **Pokémon-Karten lassen sich nach Pokédex-Nummer sortieren.** Im Reiter „Alle Karten“ erscheint beim Filter „Pokémon“ eine Sortierung mit:
   - Pokédex-Nr. aufsteigend
