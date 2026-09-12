@@ -8,6 +8,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <title>Mein Karten-Pokédex</title>
   <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
   <style>
     :root{color-scheme:dark;--bg:#0b1020;--panel:#111827;--panel2:#182235;--line:#27344a;--text:#f3f4f6;--muted:#9ca3af;--accent:#ef4444;--accent2:#dc2626;--ok:#22c55e;--shadow:0 18px 55px rgba(0,0,0,.35)}
     *{box-sizing:border-box} [hidden]{display:none!important} html,body{margin:0;background:var(--bg);color:var(--text);font:15px/1.45 system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif}
@@ -64,7 +65,7 @@
 <body>
 <div class="app">
   <header>
-    <div class="titlebar"><div class="ball"></div><div style="min-width:0;flex:1"><h1>Mein Karten-Pokédex</h1><div class="subtitle">Pokédex & Kartensammlung · v3.12</div></div><button id="installBtn" class="headbtn" title="App installieren">↓</button><button id="menuBtn" class="headbtn" title="Menü">☰</button></div>
+    <div class="titlebar"><div class="ball"></div><div style="min-width:0;flex:1"><h1>Mein Karten-Pokédex</h1><div class="subtitle">Pokédex & Kartensammlung · v3.14</div></div><button id="installBtn" class="headbtn" title="App installieren">↓</button><button id="menuBtn" class="headbtn" title="Menü">☰</button></div>
     <div class="tabbar"><button class="tab active" data-tab="dex">Pokédex</button><button class="tab" data-tab="cards">Alle Karten</button></div>
     <div class="stats" id="stats"><div class="statrow"><span><strong id="collected">0</strong> gesammelt</span><span><strong id="total">1025</strong> Pokémon</span><span id="pct">0 %</span></div><div class="progress"><div id="bar"></div></div></div>
   </header>
@@ -91,14 +92,24 @@
 
 <script>
 const DATA_URLS=['https://raw.githubusercontent.com/steffanossa/pokemon_dataset/main/pkmn_dataset.csv','https://cdn.jsdelivr.net/gh/steffanossa/pokemon_dataset@main/pkmn_dataset.csv'];
-const CACHE_KEY='dePokedexV1';let pokedex=[],cards=[],dexMap={},currentTab='dex',dexFilter='all',cardFilter='all',newCategory='pokemon',newPokemonId=null,newPhotoBlob=null,newQty=1,newTradeFrom=5,detailCardId=null,deferredInstallPrompt=null,batchFiles=[],batchIndex=-1,batchMode=false,batchBusy=false,batchSavedCount=0,batchSkippedCount=0,compareResolve=null,compareOldUrl=null,compareNewUrl=null,duplicateResolve=null,duplicateOldUrl=null,duplicateNewUrl=null,pendingAddPokemonId=null,ocrWorkerPromise=null,ocrRunToken=0,pokemonManuallyChosen=false;
+const CACHE_KEY='dePokedexV1';let pokedex=[],cards=[],dexMap={},cardMap=new Map(),pokemonCardsMap=new Map(),pokemonMap=new Map(),pokemonOcrIndex=[],pokemonOcrExactMap=new Map(),currentTab='dex',dexFilter='all',cardFilter='all',newCategory='pokemon',newPokemonId=null,newPhotoBlob=null,newQty=1,newTradeFrom=5,detailCardId=null,deferredInstallPrompt=null,batchFiles=[],batchIndex=-1,batchMode=false,batchBusy=false,batchSavedCount=0,batchSkippedCount=0,compareResolve=null,compareOldUrl=null,compareNewUrl=null,duplicateResolve=null,duplicateOldUrl=null,duplicateNewUrl=null,pendingAddPokemonId=null,ocrWorkerPromise=null,ocrWorkerPsm=null,ocrRunToken=0,pokemonManuallyChosen=false,lastOcrProgressUi=0,renderRaf=0;
 function norm(s){return(s||'').toString().normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim()}function dex(n){return'#'+String(n).padStart(4,'0')}function escapeHtml(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]))}
 function parseCSV(text){const rows=[];let row=[],field='',q=false;for(let i=0;i<text.length;i++){const c=text[i],n=text[i+1];if(q){if(c=='"'&&n=='"'){field+='"';i++}else if(c=='"'){q=false}else field+=c}else{if(c=='"')q=true;else if(c==','){row.push(field);field=''}else if(c=='\n'){row.push(field.replace(/\r$/,''));rows.push(row);row=[];field=''}else field+=c}}if(field.length||row.length){row.push(field);rows.push(row)}return rows}
 async function loadDex(){try{const c=localStorage.getItem(CACHE_KEY);if(c){const d=JSON.parse(c);if(Array.isArray(d)&&d.length>=1025){pokedex=d.slice(0,1025);return}}}catch{}let last;for(const url of DATA_URLS){try{const r=await fetch(url,{cache:'force-cache'});if(!r.ok)throw new Error('HTTP '+r.status);const rows=parseCSV(await r.text()),h=rows[0],iId=h.indexOf('dex_no'),iDe=h.indexOf('name_de'),iEn=h.indexOf('name_en');const arr=rows.slice(1).map(r=>({id:Number(r[iId]),name:r[iDe],en:r[iEn]})).filter(x=>x.id>=1&&x.id<=1025&&x.name).sort((a,b)=>a.id-b.id);if(arr.length<1025)throw new Error('Unvollständige Daten');pokedex=arr;localStorage.setItem(CACHE_KEY,JSON.stringify(arr));return}catch(e){last=e}}throw last||new Error('Pokédex konnte nicht geladen werden')}
+function buildPokemonIndexes(){
+  pokemonMap=new Map();pokemonOcrIndex=[];const exactBuckets=new Map();
+  for(const p of pokedex){
+    p._normName=norm(p.name);p._normEn=norm(p.en);pokemonMap.set(p.id,p);
+    for(const raw of [p.name,p.en]){const key=ocrNameNorm(raw);if(!key)continue;pokemonOcrIndex.push({pokemon:p,key,compact:key.replace(/ /g,'')});const ids=exactBuckets.get(key)||[];if(!ids.includes(p.id))ids.push(p.id);exactBuckets.set(key,ids)}
+  }
+  pokemonOcrExactMap=new Map();for(const [key,ids] of exactBuckets)pokemonOcrExactMap.set(key,ids.length===1?ids[0]:null);
+}
+function rebuildCardIndexes(){cardMap=new Map();pokemonCardsMap=new Map();for(const c of cards){cardMap.set(c.id,c);if(c.category==='pokemon'){const id=Number(c.pokemonId),arr=pokemonCardsMap.get(id)||[];arr.push(c);pokemonCardsMap.set(id,arr)}}}
+function cacheNewCard(card){cards.push(card);cardMap.set(card.id,card);if(card.category==='pokemon'){const id=Number(card.pokemonId),arr=pokemonCardsMap.get(id)||[];arr.push(card);pokemonCardsMap.set(id,arr)}}
 let db;function openDB(){return new Promise((res,rej)=>{const req=indexedDB.open('KartenPokedexDBv3',1);req.onupgradeneeded=()=>{const d=req.result;d.createObjectStore('cards',{keyPath:'id'});d.createObjectStore('meta',{keyPath:'key'})};req.onsuccess=()=>{db=req.result;res(db)};req.onerror=()=>rej(req.error)})}function txGetAll(store){return new Promise((res,rej)=>{const r=db.transaction(store,'readonly').objectStore(store).getAll();r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)})}function txPut(store,v){return new Promise((res,rej)=>{const r=db.transaction(store,'readwrite').objectStore(store).put(v);r.onsuccess=()=>res();r.onerror=()=>rej(r.error)})}function txDel(store,id){return new Promise((res,rej)=>{const r=db.transaction(store,'readwrite').objectStore(store).delete(id);r.onsuccess=()=>res();r.onerror=()=>rej(r.error)})}function txClear(store){return new Promise((res,rej)=>{const r=db.transaction(store,'readwrite').objectStore(store).clear();r.onsuccess=()=>res();r.onerror=()=>rej(r.error)})}
-async function reloadData(){cards=await txGetAll('cards');const meta=await txGetAll('meta');dexMap={};let legacyTradeFrom=5,hadLegacySetting=false;for(const m of meta){if(m.key.startsWith('dex:'))dexMap[Number(m.key.slice(4))]=m.value;else if(m.key==='settings:keepCount'){const v=Math.floor(Number(m.value));if(Number.isFinite(v)){legacyTradeFrom=Math.max(2,Math.min(99,v+1));hadLegacySetting=true}}}for(const c of cards){const v=Math.floor(Number(c.tradeFrom));if(!Number.isFinite(v)||v<2){c.tradeFrom=legacyTradeFrom;await txPut('cards',c)}else c.tradeFrom=Math.max(2,Math.min(99,v))}if(hadLegacySetting)await txDel('meta','settings:keepCount');updateStats();render()}async function setDexCard(pokemonId,cardId){await txPut('meta',{key:'dex:'+pokemonId,value:cardId});dexMap[pokemonId]=cardId}async function clearDexIfCard(card){if(card.category==='pokemon'&&dexMap[card.pokemonId]===card.id){await txDel('meta','dex:'+card.pokemonId);delete dexMap[card.pokemonId]}}function cardById(id){return cards.find(c=>c.id===id)}function pokeById(id){return pokedex.find(p=>p.id===Number(id))}function tradeFrom(card){const v=Math.floor(Number(card?.tradeFrom));return Number.isFinite(v)?Math.max(2,Math.min(99,v)):5}function tradableCount(card){return Math.max(0,(Number(card?.quantity)||1)-tradeFrom(card)+1)}function tradeHint(n){return `Ab dem ${n}. Exemplar wird diese Karte als tauschbar gezählt.`}function updateStats(){const owned=Object.keys(dexMap).filter(k=>cardById(dexMap[k])).length,total=pokedex.length||1025,p=total?Math.round(owned/total*1000)/10:0;document.querySelector('#collected').textContent=owned;document.querySelector('#total').textContent=total;document.querySelector('#pct').textContent=p.toLocaleString('de-DE')+' %';document.querySelector('#bar').style.width=p+'%'}
-async function render(){const q=norm(document.querySelector('#search').value),grid=document.querySelector('#grid');grid.innerHTML='';if(currentTab==='dex'){const visible=pokedex.filter(p=>{const owned=!!(dexMap[p.id]&&cardById(dexMap[p.id]));if(dexFilter==='owned'&&!owned)return false;if(dexFilter==='missing'&&owned)return false;return!q||norm(p.name).includes(q)||norm(p.en).includes(q)||String(p.id).includes(q)||dex(p.id).includes(q)});if(!visible.length){grid.innerHTML='<div class="empty">Keine Treffer.</div>';return}const frag=document.createDocumentFragment();for(const p of visible){const c=cardById(dexMap[p.id]),b=document.createElement('button');b.className='poke';b.innerHTML=`<div class="thumb"><span>${dex(p.id)}</span></div><div class="meta"><div class="num">${dex(p.id)}</div><div class="name">${escapeHtml(p.name)}</div><div class="count">${c?'Pokédex-Karte':'Noch keine Karte'}</div></div>${c?'<div class="done">✓</div>':''}`;b.onclick=()=>c?openDetail(c.id):openAddForPokemon(p.id);frag.appendChild(b);if(c?.image){const u=URL.createObjectURL(c.image),img=new Image();img.src=u;img.onload=()=>URL.revokeObjectURL(u);b.querySelector('.thumb').innerHTML='';b.querySelector('.thumb').appendChild(img)}}grid.appendChild(frag)}else{const visible=cards.filter(c=>{if(cardFilter!=='all'){if(cardFilter==='tradable'&&tradableCount(c)<1)return false;else if(cardFilter!=='tradable'&&c.category!==cardFilter)return false}const p=c.category==='pokemon'?pokeById(c.pokemonId):null,hay=[c.name,p?.name,p?.en,c.note].map(norm).join(' ');return!q||hay.includes(q)||(p&&String(p.id).includes(q))}).sort((a,b)=>b.addedAt-a.addedAt);if(!visible.length){grid.innerHTML=`<div class="empty">${cardFilter==='tradable'?'Aktuell sind keine Karten tauschbar.':'Noch keine passenden Karten.'}</div>`;return}const frag=document.createDocumentFragment();for(const c of visible){const p=c.category==='pokemon'?pokeById(c.pokemonId):null,b=document.createElement('button');b.className='cardtile';const title=p?.name||c.name||'Unbenannt',sub=c.category==='pokemon'?(p?dex(p.id):'Pokémon'):(c.category==='trainer'?'Trainer':'Energie'),isDex=c.category==='pokemon'&&dexMap[c.pokemonId]===c.id,qty=Number(c.quantity)||1,trade=tradableCount(c),tradeText=trade>0?`<div class="count">${trade}× tauschbar</div>`:'';b.innerHTML=`<div class="thumb"><span>${c.category==='pokemon'?(p?dex(p.id):'PKM'):(c.category==='trainer'?'TR':'EN')}</span></div><div class="meta"><div class="num">${escapeHtml(sub)}</div><div class="name">${escapeHtml(title)}</div>${tradeText}</div><div class="qtybadge">×${qty}</div>${isDex?'<div class="dexbadge">Pokédex ✓</div>':''}`;b.onclick=()=>openDetail(c.id);frag.appendChild(b);if(c.image){const u=URL.createObjectURL(c.image),img=new Image();img.src=u;img.onload=()=>URL.revokeObjectURL(u);b.querySelector('.thumb').innerHTML='';b.querySelector('.thumb').appendChild(img)}}grid.appendChild(frag)}}
-function setTab(tab){currentTab=tab;document.querySelectorAll('.tab').forEach(b=>b.classList.toggle('active',b.dataset.tab===tab));document.querySelector('#chipsDex').hidden=tab!=='dex';document.querySelector('#chipsCards').hidden=tab!=='cards';document.querySelector('#stats').style.display=tab==='dex'?'block':'none';document.querySelector('#search').placeholder=tab==='dex'?'Pokémon oder Nummer suchen …':'Karten durchsuchen …';render()}document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>setTab(b.dataset.tab));document.querySelector('#chipsDex').querySelectorAll('.chip').forEach(b=>b.onclick=()=>{document.querySelector('#chipsDex').querySelectorAll('.chip').forEach(x=>x.classList.remove('active'));b.classList.add('active');dexFilter=b.dataset.filter;render()});document.querySelector('#chipsCards').querySelectorAll('.chip').forEach(b=>b.onclick=()=>{document.querySelector('#chipsCards').querySelectorAll('.chip').forEach(x=>x.classList.remove('active'));b.classList.add('active');cardFilter=b.dataset.filter;render()});document.querySelector('#search').addEventListener('input',render);
+async function reloadData(){cards=await txGetAll('cards');const meta=await txGetAll('meta');dexMap={};let legacyTradeFrom=5,hadLegacySetting=false;for(const m of meta){if(m.key.startsWith('dex:'))dexMap[Number(m.key.slice(4))]=m.value;else if(m.key==='settings:keepCount'){const v=Math.floor(Number(m.value));if(Number.isFinite(v)){legacyTradeFrom=Math.max(2,Math.min(99,v+1));hadLegacySetting=true}}}for(const c of cards){const v=Math.floor(Number(c.tradeFrom));if(!Number.isFinite(v)||v<2){c.tradeFrom=legacyTradeFrom;await txPut('cards',c)}else c.tradeFrom=Math.max(2,Math.min(99,v))}if(hadLegacySetting)await txDel('meta','settings:keepCount');rebuildCardIndexes();updateStats();render()}async function setDexCard(pokemonId,cardId){await txPut('meta',{key:'dex:'+pokemonId,value:cardId});dexMap[pokemonId]=cardId}async function clearDexIfCard(card){if(card.category==='pokemon'&&dexMap[card.pokemonId]===card.id){await txDel('meta','dex:'+card.pokemonId);delete dexMap[card.pokemonId]}}function cardById(id){return cardMap.get(id)}function pokeById(id){return pokemonMap.get(Number(id))}function tradeFrom(card){const v=Math.floor(Number(card?.tradeFrom));return Number.isFinite(v)?Math.max(2,Math.min(99,v)):5}function tradableCount(card){return Math.max(0,(Number(card?.quantity)||1)-tradeFrom(card)+1)}function tradeHint(n){return `Ab dem ${n}. Exemplar wird diese Karte als tauschbar gezählt.`}function updateStats(){const owned=Object.keys(dexMap).filter(k=>cardById(dexMap[k])).length,total=pokedex.length||1025,p=total?Math.round(owned/total*1000)/10:0;document.querySelector('#collected').textContent=owned;document.querySelector('#total').textContent=total;document.querySelector('#pct').textContent=p.toLocaleString('de-DE')+' %';document.querySelector('#bar').style.width=p+'%'}
+async function render(){const q=norm(document.querySelector('#search').value),grid=document.querySelector('#grid');grid.innerHTML='';if(currentTab==='dex'){const visible=pokedex.filter(p=>{const owned=!!(dexMap[p.id]&&cardById(dexMap[p.id]));if(dexFilter==='owned'&&!owned)return false;if(dexFilter==='missing'&&owned)return false;return!q||p._normName.includes(q)||p._normEn.includes(q)||String(p.id).includes(q)||dex(p.id).includes(q)});if(!visible.length){grid.innerHTML='<div class="empty">Keine Treffer.</div>';return}const frag=document.createDocumentFragment();for(const p of visible){const c=cardById(dexMap[p.id]),b=document.createElement('button');b.className='poke';b.innerHTML=`<div class="thumb"><span>${dex(p.id)}</span></div><div class="meta"><div class="num">${dex(p.id)}</div><div class="name">${escapeHtml(p.name)}</div><div class="count">${c?'Pokédex-Karte':'Noch keine Karte'}</div></div>${c?'<div class="done">✓</div>':''}`;b.onclick=()=>c?openDetail(c.id):openAddForPokemon(p.id);frag.appendChild(b);if(c?.image){const u=URL.createObjectURL(c.image),img=new Image();img.decoding='async';img.src=u;img.onload=()=>URL.revokeObjectURL(u);b.querySelector('.thumb').innerHTML='';b.querySelector('.thumb').appendChild(img)}}grid.appendChild(frag)}else{const visible=cards.filter(c=>{if(cardFilter!=='all'){if(cardFilter==='tradable'&&tradableCount(c)<1)return false;else if(cardFilter!=='tradable'&&c.category!==cardFilter)return false}const p=c.category==='pokemon'?pokeById(c.pokemonId):null,hay=(norm(c.name)+' '+norm(c.note)+' '+(p?p._normName+' '+p._normEn:''));return!q||hay.includes(q)||(p&&String(p.id).includes(q))}).sort((a,b)=>b.addedAt-a.addedAt);if(!visible.length){grid.innerHTML=`<div class="empty">${cardFilter==='tradable'?'Aktuell sind keine Karten tauschbar.':'Noch keine passenden Karten.'}</div>`;return}const frag=document.createDocumentFragment();for(const c of visible){const p=c.category==='pokemon'?pokeById(c.pokemonId):null,b=document.createElement('button');b.className='cardtile';const title=p?.name||c.name||'Unbenannt',sub=c.category==='pokemon'?(p?dex(p.id):'Pokémon'):(c.category==='trainer'?'Trainer':'Energie'),isDex=c.category==='pokemon'&&dexMap[c.pokemonId]===c.id,qty=Number(c.quantity)||1,trade=tradableCount(c),tradeText=trade>0?`<div class="count">${trade}× tauschbar</div>`:'';b.innerHTML=`<div class="thumb"><span>${c.category==='pokemon'?(p?dex(p.id):'PKM'):(c.category==='trainer'?'TR':'EN')}</span></div><div class="meta"><div class="num">${escapeHtml(sub)}</div><div class="name">${escapeHtml(title)}</div>${tradeText}</div><div class="qtybadge">×${qty}</div>${isDex?'<div class="dexbadge">Pokédex ✓</div>':''}`;b.onclick=()=>openDetail(c.id);frag.appendChild(b);if(c.image){const u=URL.createObjectURL(c.image),img=new Image();img.decoding='async';img.src=u;img.onload=()=>URL.revokeObjectURL(u);b.querySelector('.thumb').innerHTML='';b.querySelector('.thumb').appendChild(img)}}grid.appendChild(frag)}}
+function setTab(tab){currentTab=tab;document.querySelectorAll('.tab').forEach(b=>b.classList.toggle('active',b.dataset.tab===tab));document.querySelector('#chipsDex').hidden=tab!=='dex';document.querySelector('#chipsCards').hidden=tab!=='cards';document.querySelector('#stats').style.display=tab==='dex'?'block':'none';document.querySelector('#search').placeholder=tab==='dex'?'Pokémon oder Nummer suchen …':'Karten durchsuchen …';render()}document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>setTab(b.dataset.tab));document.querySelector('#chipsDex').querySelectorAll('.chip').forEach(b=>b.onclick=()=>{document.querySelector('#chipsDex').querySelectorAll('.chip').forEach(x=>x.classList.remove('active'));b.classList.add('active');dexFilter=b.dataset.filter;render()});document.querySelector('#chipsCards').querySelectorAll('.chip').forEach(b=>b.onclick=()=>{document.querySelector('#chipsCards').querySelectorAll('.chip').forEach(x=>x.classList.remove('active'));b.classList.add('active');cardFilter=b.dataset.filter;render()});function scheduleRender(){if(renderRaf)cancelAnimationFrame(renderRaf);renderRaf=requestAnimationFrame(()=>{renderRaf=0;render()})}document.querySelector('#search').addEventListener('input',scheduleRender);
 function resetEntryFields(keepPhoto=false){
   newCategory='pokemon';newPokemonId=null;newQty=1;newTradeFrom=5;pokemonManuallyChosen=false;ocrRunToken++;
   if(!keepPhoto)newPhotoBlob=null;
@@ -119,9 +130,10 @@ function updateBatchUI(){
   else save.textContent='Karte speichern';
 }
 function cancelBatch(){batchFiles=[];batchIndex=-1;batchMode=false;batchBusy=false;batchSavedCount=0;batchSkippedCount=0;updateBatchUI()}
+function releaseBatchInput(){const i=document.querySelector('#batchInput');if(i)i.value=''}
 function resetAdd(){cancelBatch();resetEntryFields(false)}
-function openAdd(){pendingAddPokemonId=null;document.querySelector('#modeModal').classList.add('open')}
-function openAddForPokemon(id){pendingAddPokemonId=Number(id)||null;document.querySelector('#modeModal').classList.add('open')}
+function warmOcr(){getOcrWorker().catch(()=>{})}function openAdd(){pendingAddPokemonId=null;document.querySelector('#modeModal').classList.add('open');warmOcr()}
+function openAddForPokemon(id){pendingAddPokemonId=Number(id)||null;document.querySelector('#modeModal').classList.add('open');warmOcr()}
 function openPreparedAdd(){document.querySelector('#modeModal').classList.remove('open');document.querySelector('#addModal').classList.add('open');if(pendingAddPokemonId){selectPokemon(pendingAddPokemonId);pendingAddPokemonId=null}}
 function selectedExistingDexCard(){if(!newPokemonId)return null;const id=dexMap[newPokemonId];return id?cardById(id):null}
 function updateDexDefault(){
@@ -133,19 +145,33 @@ function updateDexDefault(){
 }
 function selectPokemon(id,source='manual'){const p=pokeById(id);if(!p)return;if(source!=='ocr')pokemonManuallyChosen=true;newPokemonId=p.id;document.querySelector('#pokemonPicker').value=p.name;document.querySelector('#selectedPokemonHint').textContent=`${dex(p.id)} – ${p.name}`;document.querySelector('#pickerResults').classList.remove('open');updateDexDefault()}
 document.querySelectorAll('.catbtn').forEach(b=>b.onclick=()=>{newCategory=b.dataset.cat;document.querySelectorAll('.catbtn').forEach(x=>x.classList.toggle('active',x===b));const isP=newCategory==='pokemon';document.querySelector('#pokemonFields').hidden=!isP;document.querySelector('#genericFields').hidden=isP;document.querySelector('#dexToggleWrap').hidden=!isP;if(isP){updateDexDefault();if(newPhotoBlob&&!newPokemonId&&!pokemonManuallyChosen)recognizePokemonName(newPhotoBlob)}else{ocrRunToken++;document.querySelector('#ocrStatus').hidden=true}});
-document.querySelector('#pokemonPicker').addEventListener('input',e=>{pokemonManuallyChosen=true;newPokemonId=null;updateDexDefault();const q=norm(e.target.value),box=document.querySelector('#pickerResults');box.innerHTML='';if(!q){box.classList.remove('open');return}const hits=pokedex.filter(p=>norm(p.name).includes(q)||norm(p.en).includes(q)||String(p.id).startsWith(q.replace('#',''))).slice(0,12);for(const p of hits){const d=document.createElement('div');d.className='pickrow';d.innerHTML=`<strong>${escapeHtml(p.name)}</strong> <small>${dex(p.id)}</small>`;d.onclick=()=>selectPokemon(p.id);box.appendChild(d)}box.classList.toggle('open',!!hits.length)});
+document.querySelector('#pokemonPicker').addEventListener('input',e=>{pokemonManuallyChosen=true;newPokemonId=null;updateDexDefault();const q=norm(e.target.value),box=document.querySelector('#pickerResults');box.innerHTML='';if(!q){box.classList.remove('open');return}const hits=pokedex.filter(p=>p._normName.includes(q)||p._normEn.includes(q)||String(p.id).startsWith(q.replace('#',''))).slice(0,12);for(const p of hits){const d=document.createElement('div');d.className='pickrow';d.innerHTML=`<strong>${escapeHtml(p.name)}</strong> <small>${dex(p.id)}</small>`;d.onclick=()=>selectPokemon(p.id);box.appendChild(d)}box.classList.toggle('open',!!hits.length)});
 document.querySelector('#qtyMinus').onclick=()=>{newQty=Math.max(1,newQty-1);document.querySelector('#qtyValue').textContent=newQty};document.querySelector('#qtyPlus').onclick=()=>{newQty++;document.querySelector('#qtyValue').textContent=newQty};document.querySelector('#newTradeMinus').onclick=()=>{newTradeFrom=Math.max(2,newTradeFrom-1);document.querySelector('#newTradeValue').textContent=newTradeFrom;document.querySelector('#newTradeHint').textContent=tradeHint(newTradeFrom)};document.querySelector('#newTradePlus').onclick=()=>{newTradeFrom=Math.min(99,newTradeFrom+1);document.querySelector('#newTradeValue').textContent=newTradeFrom;document.querySelector('#newTradeHint').textContent=tradeHint(newTradeFrom)};
 
-async function blobToBitmap(input){
-  if('createImageBitmap' in window){
-    try{return await createImageBitmap(input)}catch{}
-  }
-  const url=URL.createObjectURL(input);
+async function stableImageBlob(input){
+  if(!input)return input;
   try{
-    const img=await new Promise((res,rej)=>{const i=new Image();i.onload=()=>res(i);i.onerror=()=>rej(new Error('Bild konnte nicht geladen werden'));i.src=url});
-    const c=document.createElement('canvas');c.width=img.naturalWidth||img.width;c.height=img.naturalHeight||img.height;c.getContext('2d').drawImage(img,0,0);
-    return c;
-  }finally{URL.revokeObjectURL(url)}
+    const buf=await input.arrayBuffer();
+    return new Blob([buf],{type:input.type||'image/jpeg'});
+  }catch{return input}
+}
+async function blobToBitmap(input){
+  let lastErr=null;
+  for(let attempt=0;attempt<2;attempt++){
+    const source=attempt===0?input:await stableImageBlob(input);
+    if('createImageBitmap' in window){
+      try{return await createImageBitmap(source)}catch(err){lastErr=err}
+    }
+    const url=URL.createObjectURL(source);
+    try{
+      const img=await new Promise((res,rej)=>{const i=new Image();i.onload=()=>res(i);i.onerror=()=>rej(new Error('Bild konnte nicht geladen werden'));i.src=url});
+      const c=document.createElement('canvas');c.width=img.naturalWidth||img.width;c.height=img.naturalHeight||img.height;c.getContext('2d').drawImage(img,0,0);
+      return c;
+    }catch(err){lastErr=err}
+    finally{URL.revokeObjectURL(url)}
+    if(attempt===0)await new Promise(r=>setTimeout(r,120));
+  }
+  throw lastErr||new Error('Bild konnte nicht geladen werden');
 }
 function closeBitmapLike(obj){try{obj?.close?.()}catch{}}
 function bitmapDims(obj){return{width:obj.width||obj.naturalWidth||obj.videoWidth||0,height:obj.height||obj.naturalHeight||obj.videoHeight||0}}
@@ -294,7 +320,8 @@ async function compressImage(file){
   return await new Promise(res=>c.toBlob(res,'image/jpeg',.86));
 }
 async function autoPrepareCardBlob(input){
-  const compressed=await compressImage(input),bmp=await blobToBitmap(compressed);
+  const stableInput=await stableImageBlob(input);
+  const compressed=await compressImage(stableInput),bmp=await blobToBitmap(compressed);
   try{
     const sourceCanvas=drawBitmapToCanvas(bmp),quad=detectCardQuadFromCanvas(sourceCanvas);
     if(!quad)return compressed;
@@ -304,7 +331,7 @@ async function autoPrepareCardBlob(input){
 }
 function showPhotoPreview(blob){
   newPhotoBlob=blob;
-  const u=URL.createObjectURL(blob),img=new Image();img.src=u;img.onload=()=>URL.revokeObjectURL(u);
+  const u=URL.createObjectURL(blob),img=new Image();img.decoding='async';img.src=u;img.onload=()=>URL.revokeObjectURL(u);
   const box=document.querySelector('#photoPreview');box.innerHTML='';box.appendChild(img);
 }
 async function choosePhoto(file){if(!file)return;const prepared=await autoPrepareCardBlob(file);showPhotoPreview(prepared);if(newCategory==='pokemon')recognizePokemonName(prepared)}
@@ -328,106 +355,87 @@ async function getOcrWorker(){
   ocrWorkerPromise=(async()=>{
     const T=await loadOcrLibrary();
     const worker=await T.createWorker('eng',1,{logger:m=>{
-      if(m?.status==='recognizing text'&&typeof m.progress==='number')setOcrStatus(`Name wird erkannt … ${Math.round(m.progress*100)} %`,'working');
+      if(m?.status!=='recognizing text'||typeof m.progress!=='number')return;
+      const now=performance.now();if(now-lastOcrProgressUi<220)return;lastOcrProgressUi=now;
+      if(document.querySelector('#addModal')?.classList.contains('open'))setOcrStatus(`Name wird erkannt … ${Math.round(m.progress*100)} %`,'working');
     }});
-    try{await worker.setParameters({tessedit_pageseg_mode:'7',preserve_interword_spaces:'1'});}catch{}
+    try{await worker.setParameters({tessedit_pageseg_mode:'7',preserve_interword_spaces:'1',tessedit_char_whitelist:"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-.' :"});ocrWorkerPsm='7'}catch{}
     return worker;
-  })().catch(err=>{ocrWorkerPromise=null;throw err});
+  })().catch(err=>{ocrWorkerPromise=null;ocrWorkerPsm=null;throw err});
   return ocrWorkerPromise;
 }
-function nameOcrRegionCanvas(bmp,region,mode='contrast'){
+function histPercentile(hist,total,p){const target=Math.max(0,Math.min(total-1,Math.round((total-1)*p)));let acc=0;for(let i=0;i<hist.length;i++){acc+=hist[i];if(acc>target)return i}return hist.length-1}
+function nameOcrRegionCanvas(bmp,region,mode='contrast',opts={}){
   const d=bitmapDims(bmp),sx=Math.max(0,Math.round(d.width*region.x)),sy=Math.max(0,Math.round(d.height*region.y)),sw=Math.max(2,Math.round(d.width*region.w)),sh=Math.max(2,Math.round(d.height*region.h));
-  const targetW=Math.min(1700,Math.max(1050,Math.round(sw*2.7))),targetH=Math.max(150,Math.round(targetW*(sh/sw)));
-  const c=document.createElement('canvas');c.width=targetW;c.height=targetH;const ctx=c.getContext('2d',{willReadFrequently:true});
+  const scale=opts.scale||2,minW=opts.minW||850,maxW=opts.maxW||1400,targetW=Math.min(maxW,Math.max(minW,Math.round(sw*scale))),targetH=Math.max(110,Math.round(targetW*(sh/sw)));
+  const c=document.createElement('canvas');c.width=targetW;c.height=targetH;const ctx=c.getContext('2d',{willReadFrequently:true});ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';
   ctx.fillStyle='#fff';ctx.fillRect(0,0,targetW,targetH);ctx.drawImage(bmp,sx,sy,sw,sh,0,0,targetW,targetH);
-  const im=ctx.getImageData(0,0,targetW,targetH),a=im.data,gray=[];
-  for(let i=0;i<a.length;i+=4){const g=a[i]*.299+a[i+1]*.587+a[i+2]*.114;gray.push(g)}
-  const lo=percentile(gray,.04),hi=percentile(gray,.96),span=Math.max(24,hi-lo);
+  const im=ctx.getImageData(0,0,targetW,targetH),a=im.data,count=targetW*targetH,gray=new Uint8Array(count),hist=new Uint32Array(256);
+  for(let i=0,j=0;j<count;i+=4,j++){const g=Math.max(0,Math.min(255,Math.round(a[i]*.299+a[i+1]*.587+a[i+2]*.114)));gray[j]=g;hist[g]++}
+  const lo=histPercentile(hist,count,.04),hi=histPercentile(hist,count,.96),span=Math.max(24,hi-lo);
   let threshold=0;
   if(mode==='binary'){
-    const hist=new Array(256).fill(0);for(const g of gray)hist[Math.max(0,Math.min(255,Math.round(g)))]++;
-    let total=gray.length,sum=0;for(let i=0;i<256;i++)sum+=i*hist[i];
-    let sumB=0,wB=0,best=-1;for(let i=0;i<256;i++){wB+=hist[i];if(!wB)continue;const wF=total-wB;if(!wF)break;sumB+=i*hist[i];const mB=sumB/wB,mF=(sum-sumB)/wF,v=wB*wF*(mB-mF)*(mB-mF);if(v>best){best=v;threshold=i}}
-    threshold=Math.max(80,Math.min(210,threshold));
+    let sum=0;for(let i=0;i<256;i++)sum+=i*hist[i];let sumB=0,wB=0,best=-1;
+    for(let i=0;i<256;i++){wB+=hist[i];if(!wB)continue;const wF=count-wB;if(!wF)break;sumB+=i*hist[i];const mB=sumB/wB,mF=(sum-sumB)/wF,v=wB*wF*(mB-mF)*(mB-mF);if(v>best){best=v;threshold=i}}
+    threshold=Math.max(70,Math.min(220,threshold));
   }
-  for(let i=0,j=0;i<a.length;i+=4,j++){
-    let g=(gray[j]-lo)*255/span;g=Math.max(0,Math.min(255,g));
-    if(mode==='binary')g=g<threshold?0:255;
-    else g=(g-128)*1.35+128;
-    g=Math.max(0,Math.min(255,g));a[i]=a[i+1]=a[i+2]=g;a[i+3]=255;
+  for(let i=0,j=0;j<count;i+=4,j++){
+    let g;
+    if(mode==='binary')g=gray[j]<threshold?0:255;
+    else{g=(gray[j]-lo)*255/span;g=(g-128)*1.32+128;g=Math.max(0,Math.min(255,g))}
+    a[i]=a[i+1]=a[i+2]=g;a[i+3]=255;
   }
   ctx.putImageData(im,0,0);return c;
 }
-async function makeNameOcrCanvases(blob){
-  const bmp=await blobToBitmap(blob);
-  try{
-    // Die Pokémon-Namen sitzen bei fast allen Kartendesigns links oben. Mehrere enge
-    // Ausschnitte sind zuverlässiger als der frühere große Bereich mit KP/Level-Zeilen.
-    return [
-      {canvas:nameOcrRegionCanvas(bmp,{x:.018,y:.010,w:.64,h:.088},'binary'),psm:'7',label:'Titel'},
-      {canvas:nameOcrRegionCanvas(bmp,{x:.015,y:.004,w:.72,h:.112},'contrast'),psm:'7',label:'Titel erweitert'},
-      {canvas:nameOcrRegionCanvas(bmp,{x:.010,y:.000,w:.80,h:.145},'binary'),psm:'6',label:'Kopfbereich'}
-    ];
-  }finally{closeBitmapLike(bmp)}
-}
+async function setOcrPsm(worker,psm){if(ocrWorkerPsm===psm)return;try{await worker.setParameters({tessedit_pageseg_mode:psm});ocrWorkerPsm=psm}catch{}}
+async function runNameOcrPass(worker,canvas,psm){await setOcrPsm(worker,psm);const result=await worker.recognize(canvas);return{text:result?.data?.text||'',confidence:Number(result?.data?.confidence)||0}}
 function levenshtein(a,b){
   if(a===b)return 0;if(!a.length)return b.length;if(!b.length)return a.length;
-  const prev=Array.from({length:b.length+1},(_,i)=>i),cur=new Array(b.length+1);
-  for(let i=1;i<=a.length;i++){cur[0]=i;for(let j=1;j<=b.length;j++)cur[j]=Math.min(cur[j-1]+1,prev[j]+1,prev[j-1]+(a[i-1]===b[j-1]?0:1));for(let j=0;j<=b.length;j++)prev[j]=cur[j]}
-  return prev[b.length];
+  if(a.length>b.length){const t=a;a=b;b=t}
+  const prev=new Uint16Array(a.length+1),cur=new Uint16Array(a.length+1);for(let i=0;i<=a.length;i++)prev[i]=i;
+  for(let j=1;j<=b.length;j++){cur[0]=j;for(let i=1;i<=a.length;i++)cur[i]=Math.min(cur[i-1]+1,prev[i]+1,prev[i-1]+(a[i-1]===b[j-1]?0:1));prev.set(cur)}
+  return prev[a.length];
 }
 function ocrNameNorm(s){return norm(s).replace(/[^a-z0-9]+/g,' ').replace(/\s+/g,' ').trim()}
 function bestPokemonFromOcr(rawText){
   const text=ocrNameNorm(rawText);if(!text)return null;
-  const tokens=text.split(' ').filter(Boolean).slice(0,18),phrases=[];
-  for(let i=0;i<tokens.length;i++)for(let n=1;n<=3&&i+n<=tokens.length;n++)phrases.push(tokens.slice(i,i+n).join(' '));
-  let best=null,second=null;
-  for(const p of pokedex){
-    const variants=[p.name,p.en].map(ocrNameNorm).filter(Boolean);let pBest=0;
-    for(const candidate of variants){
-      if(text===candidate||text.startsWith(candidate+' ')||text.includes(' '+candidate+' '))pBest=Math.max(pBest,.995);
-      for(const phrase of phrases){
-        const maxLen=Math.max(candidate.length,phrase.length);if(!maxLen)continue;
-        let sim=1-levenshtein(candidate,phrase)/maxLen;
-        // OCR verwechselt bei Kartenschriften besonders oft I/l/1 sowie O/0.
-        const compactCandidate=candidate.replace(/ /g,''),compactPhrase=phrase.replace(/ /g,'');
-        if(compactCandidate.length>=4&&compactPhrase.length>=3){
-          const a=compactCandidate.replace(/1/g,'l').replace(/0/g,'o'),b=compactPhrase.replace(/1/g,'l').replace(/0/g,'o');
-          sim=Math.max(sim,1-levenshtein(a,b)/Math.max(a.length,b.length));
-        }
-        if(sim>pBest)pBest=sim;
-      }
-    }
-    const item={pokemon:p,score:pBest};if(!best||item.score>best.score){second=best;best=item}else if(!second||item.score>second.score)second=item;
+  const tokens=text.split(' ').filter(Boolean).slice(0,18),phraseSet=new Set();
+  for(let i=0;i<tokens.length;i++)for(let n=1;n<=3&&i+n<=tokens.length;n++)phraseSet.add(tokens.slice(i,i+n).join(' '));
+  phraseSet.add(text);const phrases=[...phraseSet];
+  for(const phrase of phrases){const exactId=pokemonOcrExactMap.get(phrase);if(exactId)return{pokemon:pokeById(exactId),score:.995,raw:rawText,margin:1}}
+  const compactPhrases=phrases.map(v=>({raw:v,compact:v.replace(/ /g,''),fixed:v.replace(/ /g,'').replace(/1/g,'l').replace(/0/g,'o')}));
+  const byPokemon=new Map();
+  for(const entry of pokemonOcrIndex){let pBest=0,elen=entry.compact.length,maxDelta=Math.max(3,Math.ceil(elen*.42));
+    for(const phrase of compactPhrases){if(Math.abs(elen-phrase.compact.length)>maxDelta)continue;const maxLen=Math.max(elen,phrase.compact.length);if(!maxLen)continue;let sim=1-levenshtein(entry.compact,phrase.compact)/maxLen;if(elen>=4&&phrase.compact.length>=3){const fixedEntry=entry.compact.replace(/1/g,'l').replace(/0/g,'o');sim=Math.max(sim,1-levenshtein(fixedEntry,phrase.fixed)/Math.max(fixedEntry.length,phrase.fixed.length))}if(sim>pBest)pBest=sim}
+    const prev=byPokemon.get(entry.pokemon.id)||0;if(pBest>prev)byPokemon.set(entry.pokemon.id,pBest);
   }
-  if(!best)return null;
-  const nlen=ocrNameNorm(best.pokemon.name).replace(/ /g,'').length,threshold=nlen<=4?.79:nlen<=6?.70:.64,margin=best.score-(second?.score||0);
-  if(best.score<threshold)return null;
-  if(best.score<.82&&margin<.045)return null;
-  return{...best,raw:rawText,margin};
+  let best=null,second=null;for(const [id,score] of byPokemon){const item={pokemon:pokeById(id),score};if(!best||score>best.score){second=best;best=item}else if(!second||score>second.score)second=item}
+  if(!best)return null;const nlen=ocrNameNorm(best.pokemon.name).replace(/ /g,'').length,threshold=nlen<=4?.79:nlen<=6?.70:.64,margin=best.score-(second?.score||0);if(best.score<threshold)return null;if(best.score<.82&&margin<.045)return null;return{...best,raw:rawText,margin};
 }
+function strongOcrMatch(match,confidence=0){return !!match&&(match.score>=.94||(match.score>=.88&&match.margin>=.06)||(match.score>=.84&&match.margin>=.11&&confidence>=50))}
 async function recognizePokemonName(blob){
   if(!blob||newCategory!=='pokemon'||pokemonManuallyChosen)return;
-  const token=++ocrRunToken;setOcrStatus('Name wird automatisch erkannt …','working');
+  const token=++ocrRunToken;setOcrStatus('Name wird automatisch erkannt …','working');const started=performance.now();let bmp=null;
   try{
-    const [worker,passes]=await Promise.all([getOcrWorker(),makeNameOcrCanvases(blob)]);
+    const results=await Promise.all([getOcrWorker(),blobToBitmap(blob)]),worker=results[0];bmp=results[1];
     if(token!==ocrRunToken||newCategory!=='pokemon'||pokemonManuallyChosen)return;
     let best=null,raw=[];
-    for(let i=0;i<passes.length;i++){
+    const fastCanvas=nameOcrRegionCanvas(bmp,{x:.018,y:.010,w:.64,h:.088},'binary',{scale:1.75,minW:760,maxW:980});
+    setOcrStatus('Name wird erkannt …','working');let out=await runNameOcrPass(worker,fastCanvas,'7');raw.push(out.text);let match=bestPokemonFromOcr(out.text);if(match)best=match;
+    if(!strongOcrMatch(best,out.confidence)){
       if(token!==ocrRunToken||newCategory!=='pokemon'||pokemonManuallyChosen)return;
-      const pass=passes[i];setOcrStatus(`Name wird erkannt … Versuch ${i+1}/${passes.length}`,'working');
-      try{await worker.setParameters({tessedit_pageseg_mode:pass.psm,preserve_interword_spaces:'1',tessedit_char_whitelist:"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-.' :"});}catch{}
-      const result=await worker.recognize(pass.canvas),txt=result?.data?.text||'';raw.push(txt);
-      const match=bestPokemonFromOcr(txt);if(match&&(!best||match.score>best.score))best=match;
-      if(best&&best.score>=.90)break;
+      const canvas2=nameOcrRegionCanvas(bmp,{x:.015,y:.004,w:.72,h:.112},'contrast',{scale:2.15,minW:940,maxW:1280});out=await runNameOcrPass(worker,canvas2,'7');raw.push(out.text);match=bestPokemonFromOcr(out.text);if(match&&(!best||match.score>best.score))best=match;
+      if(!strongOcrMatch(best,out.confidence)){
+        if(token!==ocrRunToken||newCategory!=='pokemon'||pokemonManuallyChosen)return;
+        const canvas3=nameOcrRegionCanvas(bmp,{x:.010,y:.000,w:.80,h:.145},'binary',{scale:2.25,minW:1000,maxW:1380});out=await runNameOcrPass(worker,canvas3,'6');raw.push(out.text);match=bestPokemonFromOcr(out.text);if(match&&(!best||match.score>best.score))best=match;
+      }
     }
     if(token!==ocrRunToken||newCategory!=='pokemon'||pokemonManuallyChosen)return;
-    console.debug('Pokémon-OCR:',raw);
+    console.debug('Pokémon-OCR:',raw,Math.round(performance.now()-started)+' ms');
     if(best){selectPokemon(best.pokemon.id,'ocr');setOcrStatus(`Automatisch erkannt: ${best.pokemon.name} · bitte kurz prüfen.`,'ok')}
     else setOcrStatus('Name nicht sicher erkannt – bitte manuell auswählen.','warn');
-  }catch(err){
-    if(token!==ocrRunToken)return;console.warn('Namens-Erkennung nicht verfügbar:',err);setOcrStatus('Namens-Erkennung nicht verfügbar – bitte manuell auswählen.','warn');
-  }
+  }catch(err){if(token!==ocrRunToken)return;console.warn('Namens-Erkennung nicht verfügbar:',err);setOcrStatus('Namens-Erkennung nicht verfügbar – bitte manuell auswählen.','warn')}
+  finally{closeBitmapLike(bmp)}
 }
 
 const BITCOUNT=[0,1,1,2,1,2,2,3,1,2,2,3,2,3,3,4];
@@ -465,7 +473,7 @@ async function ensureCardFingerprint(card){
   try{card.visualHash=await computeVisualFingerprint(card.image);await txPut('cards',card);return card.visualHash}catch{return null}
 }
 async function findLikelyDuplicate(pokemonId,newBlob){
-  const fingerprint=await computeVisualFingerprint(newBlob),candidates=cards.filter(c=>c.category==='pokemon'&&Number(c.pokemonId)===Number(pokemonId));
+  const fingerprint=await computeVisualFingerprint(newBlob),candidates=pokemonCardsMap.get(Number(pokemonId))||[];
   let best=null;
   for(const card of candidates){const oldFp=await ensureCardFingerprint(card);if(!oldFp)continue;const sim=fingerprintScore(fingerprint,oldFp);if(!sim)continue;if(!best||sim.score>best.score)best={card,...sim}}
   if(!best)return{fingerprint,candidate:null};
@@ -487,9 +495,16 @@ document.querySelector('#duplicateSkip').onclick=()=>resolveDuplicate('skip');do
 async function loadBatchCurrent(){
   if(!batchMode||batchIndex<0||batchIndex>=batchFiles.length)return;
   batchBusy=true;resetEntryFields(false);updateBatchUI();
-  document.querySelector('#photoPreview').innerHTML=`Bild ${batchIndex+1} von ${batchFiles.length} wird vorbereitet …`;
-  try{newPhotoBlob=await autoPrepareCardBlob(batchFiles[batchIndex]);showPhotoPreview(newPhotoBlob);if(newCategory==='pokemon')recognizePokemonName(newPhotoBlob)}
-  catch(err){newPhotoBlob=null;document.querySelector('#photoPreview').innerHTML='Bild konnte nicht verarbeitet werden.';alert('Bild konnte nicht verarbeitet werden: '+err.message)}
+  const box=document.querySelector('#photoPreview');box.innerHTML=`Bild ${batchIndex+1} von ${batchFiles.length} wird vorbereitet …`;
+  try{
+    let prepared=null,lastErr=null;
+    for(let attempt=0;attempt<2&&!prepared;attempt++){
+      try{prepared=await autoPrepareCardBlob(batchFiles[batchIndex])}
+      catch(err){lastErr=err;if(attempt===0){box.innerHTML=`Bild ${batchIndex+1} wird erneut geladen …`;await new Promise(r=>setTimeout(r,180))}}
+    }
+    if(!prepared)throw lastErr||new Error('Bild konnte nicht geladen werden');
+    newPhotoBlob=prepared;showPhotoPreview(newPhotoBlob);if(newCategory==='pokemon')recognizePokemonName(newPhotoBlob)
+  }catch(err){newPhotoBlob=null;box.innerHTML='<div style="padding:28px 18px;text-align:center"><strong>Bild konnte nicht verarbeitet werden.</strong><br><span class="hint">Du kannst dieses Bild überspringen und mit dem nächsten fortfahren.</span></div>';console.warn('Batch-Bild fehlgeschlagen:',err)}
   finally{batchBusy=false}
 }
 async function startBatch(files){
@@ -501,21 +516,18 @@ function batchFinishedMessage(saved,skipped){
   const parts=[];if(saved)parts.push(`${saved} ${saved===1?'Bild verarbeitet':'Bilder verarbeitet'}`);if(skipped)parts.push(`${skipped} ${skipped===1?'Bild übersprungen':'Bilder übersprungen'}`);return parts.join(' · ')+'.';
 }
 async function finishSavedEntry(){
-  if(batchMode)batchSavedCount++;
-  await reloadData();
-  if(batchMode&&batchIndex<batchFiles.length-1){batchIndex++;await loadBatchCurrent();return}
-  const wasBatch=batchMode,saved=batchSavedCount,skipped=batchSkippedCount;cancelBatch();document.querySelector('#addModal').classList.remove('open');
-  if(wasBatch)alert(batchFinishedMessage(saved,skipped))
+  if(batchMode){batchSavedCount++;updateStats();if(batchIndex<batchFiles.length-1){batchIndex++;await loadBatchCurrent();return}}
+  const wasBatch=batchMode,saved=batchSavedCount,skipped=batchSkippedCount;await reloadData();cancelBatch();releaseBatchInput();document.querySelector('#addModal').classList.remove('open');if(wasBatch)alert(batchFinishedMessage(saved,skipped))
 }
 async function finishSkippedEntry(){
-  if(batchMode){batchSkippedCount++;if(batchIndex<batchFiles.length-1){batchIndex++;await loadBatchCurrent();return}const saved=batchSavedCount,skipped=batchSkippedCount;cancelBatch();document.querySelector('#addModal').classList.remove('open');alert(batchFinishedMessage(saved,skipped));return}
-  document.querySelector('#addModal').classList.remove('open');
+  if(batchMode){batchSkippedCount++;updateStats();if(batchIndex<batchFiles.length-1){batchIndex++;await loadBatchCurrent();return}const saved=batchSavedCount,skipped=batchSkippedCount;await reloadData();cancelBatch();releaseBatchInput();document.querySelector('#addModal').classList.remove('open');alert(batchFinishedMessage(saved,skipped));return}
+  await reloadData();document.querySelector('#addModal').classList.remove('open');
 }
 document.querySelector('#skipBatchImage').onclick=async()=>{if(!batchMode||batchBusy)return;await finishSkippedEntry()};
 document.querySelector('#modeSingle').onclick=()=>document.querySelector('#galleryInput').click();
 document.querySelector('#modeBatch').onclick=()=>document.querySelector('#batchInput').click();
 document.querySelector('#galleryInput').onchange=async e=>{const file=e.target.files?.[0];try{if(!file)return;resetAdd();openPreparedAdd();await choosePhoto(file)}catch(err){document.querySelector('#addModal').classList.remove('open');alert('Bild konnte nicht verarbeitet werden: '+err.message)}e.target.value=''};
-document.querySelector('#batchInput').onchange=async e=>{const files=e.target.files;try{if(!files||!files.length)return;resetAdd();openPreparedAdd();await startBatch(files)}catch(err){document.querySelector('#addModal').classList.remove('open');alert('Stapel konnte nicht gestartet werden: '+err.message)}e.target.value=''};
+document.querySelector('#batchInput').onchange=async e=>{const files=e.target.files;try{if(!files||!files.length)return;resetAdd();openPreparedAdd();await startBatch(files)}catch(err){document.querySelector('#addModal').classList.remove('open');alert('Stapel konnte nicht gestartet werden: '+err.message)}};
 function cleanupCompareUrls(){if(compareOldUrl){URL.revokeObjectURL(compareOldUrl);compareOldUrl=null}if(compareNewUrl){URL.revokeObjectURL(compareNewUrl);compareNewUrl=null}}
 function resolveDexCompare(choice){if(!compareResolve)return;const r=compareResolve;compareResolve=null;document.querySelector('#dexCompareModal').classList.remove('open');cleanupCompareUrls();r(choice)}
 function askDexChoice(oldCard,newCard,pokemonId){
@@ -565,7 +577,7 @@ document.querySelector('#saveCard').onclick=async()=>{
   const existingDexId=newCategory==='pokemon'?dexMap[pokemonId]:null,existingDexCard=existingDexId?cardById(existingDexId):null;
   const c={id:crypto.randomUUID(),category:newCategory,pokemonId,name,image:newPhotoBlob,quantity:newQty,tradeFrom:newTradeFrom,note:document.querySelector('#newNote').value.trim(),addedAt:Date.now()};
   if(visualHash)c.visualHash=visualHash;
-  await txPut('cards',c);
+  await txPut('cards',c);cacheNewCard(c);
   if(newCategory==='pokemon'){
     if(!existingDexCard){if(document.querySelector('#useForDex').checked)await setDexCard(pokemonId,c.id)}
     else if(document.querySelector('#useForDex').checked)await setDexCard(pokemonId,c.id);
@@ -574,8 +586,8 @@ document.querySelector('#saveCard').onclick=async()=>{
   await finishSavedEntry();
 };
 async function openDetail(id){const c=cardById(id);if(!c)return;detailCardId=id;const p=c.category==='pokemon'?pokeById(c.pokemonId):null;document.querySelector('#detailName').textContent=p?.name||c.name;document.querySelector('#detailSub').textContent=c.category==='pokemon'?(p?dex(p.id):'Pokémon'):(c.category==='trainer'?'Trainer':'Energie');document.querySelector('#detailQty').textContent=Number(c.quantity)||1;document.querySelector('#detailTradeValue').textContent=tradeFrom(c);document.querySelector('#detailTradeHint').textContent=tradeHint(tradeFrom(c));document.querySelector('#detailNote').value=c.note||'';const u=URL.createObjectURL(c.image);document.querySelector('#detailImg').src=u;document.querySelector('#detailImg').onload=()=>URL.revokeObjectURL(u);const dexBtn=document.querySelector('#setDexBtn');if(c.category==='pokemon'){dexBtn.hidden=false;dexBtn.textContent=dexMap[c.pokemonId]===c.id?'Ist Pokédex-Karte ✓':'Als Pokédex-Karte'}else dexBtn.hidden=true;document.querySelector('#detailModal').classList.add('open')}function currentDetail(){return cardById(detailCardId)}document.querySelector('#detailMinus').onclick=()=>{const c=currentDetail();if(!c)return;c.quantity=Math.max(1,(Number(c.quantity)||1)-1);document.querySelector('#detailQty').textContent=c.quantity};document.querySelector('#detailPlus').onclick=()=>{const c=currentDetail();if(!c)return;c.quantity=(Number(c.quantity)||1)+1;document.querySelector('#detailQty').textContent=c.quantity};document.querySelector('#detailTradeMinus').onclick=()=>{const c=currentDetail();if(!c)return;c.tradeFrom=Math.max(2,tradeFrom(c)-1);document.querySelector('#detailTradeValue').textContent=c.tradeFrom;document.querySelector('#detailTradeHint').textContent=tradeHint(c.tradeFrom)};document.querySelector('#detailTradePlus').onclick=()=>{const c=currentDetail();if(!c)return;c.tradeFrom=Math.min(99,tradeFrom(c)+1);document.querySelector('#detailTradeValue').textContent=c.tradeFrom;document.querySelector('#detailTradeHint').textContent=tradeHint(c.tradeFrom)};document.querySelector('#saveDetail').onclick=async()=>{const c=currentDetail();if(!c)return;c.note=document.querySelector('#detailNote').value;c.quantity=Number(document.querySelector('#detailQty').textContent)||1;c.tradeFrom=Math.max(2,Math.min(99,Number(document.querySelector('#detailTradeValue').textContent)||5));await txPut('cards',c);document.querySelector('#detailModal').classList.remove('open');await reloadData()};document.querySelector('#setDexBtn').onclick=async()=>{const c=currentDetail();if(!c||c.category!=='pokemon')return;await setDexCard(c.pokemonId,c.id);document.querySelector('#setDexBtn').textContent='Ist Pokédex-Karte ✓';await reloadData()};document.querySelector('#deleteCard').onclick=async()=>{const c=currentDetail();if(!c||!confirm('Diese Karte wirklich löschen?'))return;await clearDexIfCard(c);await txDel('cards',c.id);document.querySelector('#detailModal').classList.remove('open');await reloadData()};
-document.querySelector('#fab').onclick=openAdd;document.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>{const id=b.dataset.close;if(id==='addModal'){cancelBatch();pendingAddPokemonId=null}if(id==='modeModal')pendingAddPokemonId=null;document.querySelector('#'+id).classList.remove('open')});document.querySelectorAll('.overlay').forEach(o=>o.addEventListener('click',e=>{if(e.target===o&&!o.dataset.locked){if(o.id==='addModal'){cancelBatch();pendingAddPokemonId=null}if(o.id==='modeModal')pendingAddPokemonId=null;o.classList.remove('open')}}));
-async function blobToDataURL(blob){return await new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result);r.onerror=()=>rej(r.error);r.readAsDataURL(blob)})}async function dataURLToBlob(s){const r=await fetch(s);return await r.blob()}document.querySelector('#exportBtn').onclick=async()=>{const packed=[];for(const c of cards)packed.push({...c,image:await blobToDataURL(c.image)});const payload={app:'KartenPokedex',version:3,appVersion:'3.12',exportedAt:new Date().toISOString(),cards:packed,dexMap},blob=new Blob([JSON.stringify(payload)],{type:'application/json'}),a=document.createElement('a'),count=cards.reduce((s,c)=>s+(Number(c.quantity)||1),0);a.href=URL.createObjectURL(blob);a.download=`KartenPokedex_${count}-Karten_${new Date().toISOString().slice(0,10)}.json`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1200)};document.querySelector('#importBtn').onclick=()=>document.querySelector('#importInput').click();document.querySelector('#importInput').onchange=async e=>{try{const file=e.target.files?.[0];if(!file)return;const d=JSON.parse(await file.text());if(d.version!==3||!Array.isArray(d.cards)){alert('Dieses Backup gehört nicht zur Version 3.');return}if(!confirm(`${d.cards.length} Karteneinträge importieren? Vorhandene Daten werden ersetzt.`))return;await txClear('cards');await txClear('meta');const legacyTradeFrom=Number.isFinite(Number(d.keepCount))?Math.max(2,Math.min(99,Math.floor(Number(d.keepCount))+1)):5;for(const c of d.cards){const tf=Number.isFinite(Number(c.tradeFrom))?Math.max(2,Math.min(99,Math.floor(Number(c.tradeFrom)))):legacyTradeFrom;await txPut('cards',{...c,tradeFrom:tf,image:await dataURLToBlob(c.image)})}for(const[pid,cid]of Object.entries(d.dexMap||{}))await txPut('meta',{key:'dex:'+pid,value:cid});await reloadData();alert('Backup importiert.')}catch(err){alert('Import fehlgeschlagen: '+err.message)}e.target.value=''};
+document.querySelector('#fab').onclick=openAdd;document.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>{const id=b.dataset.close;if(id==='addModal'){cancelBatch();releaseBatchInput();pendingAddPokemonId=null}if(id==='modeModal')pendingAddPokemonId=null;document.querySelector('#'+id).classList.remove('open')});document.querySelectorAll('.overlay').forEach(o=>o.addEventListener('click',e=>{if(e.target===o&&!o.dataset.locked){if(o.id==='addModal'){cancelBatch();releaseBatchInput();pendingAddPokemonId=null}if(o.id==='modeModal')pendingAddPokemonId=null;o.classList.remove('open')}}));
+async function blobToDataURL(blob){return await new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result);r.onerror=()=>rej(r.error);r.readAsDataURL(blob)})}async function dataURLToBlob(s){const r=await fetch(s);return await r.blob()}document.querySelector('#exportBtn').onclick=async()=>{const packed=[];for(const c of cards)packed.push({...c,image:await blobToDataURL(c.image)});const payload={app:'KartenPokedex',version:3,appVersion:'3.14',exportedAt:new Date().toISOString(),cards:packed,dexMap},blob=new Blob([JSON.stringify(payload)],{type:'application/json'}),a=document.createElement('a'),count=cards.reduce((s,c)=>s+(Number(c.quantity)||1),0);a.href=URL.createObjectURL(blob);a.download=`KartenPokedex_${count}-Karten_${new Date().toISOString().slice(0,10)}.json`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1200)};document.querySelector('#importBtn').onclick=()=>document.querySelector('#importInput').click();document.querySelector('#importInput').onchange=async e=>{try{const file=e.target.files?.[0];if(!file)return;const d=JSON.parse(await file.text());if(d.version!==3||!Array.isArray(d.cards)){alert('Dieses Backup gehört nicht zur Version 3.');return}if(!confirm(`${d.cards.length} Karteneinträge importieren? Vorhandene Daten werden ersetzt.`))return;await txClear('cards');await txClear('meta');const legacyTradeFrom=Number.isFinite(Number(d.keepCount))?Math.max(2,Math.min(99,Math.floor(Number(d.keepCount))+1)):5;for(const c of d.cards){const tf=Number.isFinite(Number(c.tradeFrom))?Math.max(2,Math.min(99,Math.floor(Number(c.tradeFrom)))):legacyTradeFrom;await txPut('cards',{...c,tradeFrom:tf,image:await dataURLToBlob(c.image)})}for(const[pid,cid]of Object.entries(d.dexMap||{}))await txPut('meta',{key:'dex:'+pid,value:cid});await reloadData();alert('Backup importiert.')}catch(err){alert('Import fehlgeschlagen: '+err.message)}e.target.value=''};
 document.querySelector('#menuBtn').onclick=()=>document.querySelector('#tools').classList.toggle('open');function isStandalone(){return matchMedia('(display-mode: standalone)').matches||navigator.standalone===true}function updateInstall(){const b=document.querySelector('#installBtn');if(isStandalone()){b.classList.add('installed');b.textContent='✓'}else{b.classList.remove('installed');b.textContent='↓'}}window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferredInstallPrompt=e;updateInstall()});window.addEventListener('appinstalled',()=>{deferredInstallPrompt=null;updateInstall()});document.querySelector('#installBtn').onclick=async()=>{if(isStandalone()){alert('Die App ist bereits installiert.');return}if(deferredInstallPrompt){deferredInstallPrompt.prompt();try{await deferredInstallPrompt.userChoice}catch{}deferredInstallPrompt=null}else alert('Öffne die Seite in Chrome und wähle im Browser-Menü „App installieren“ bzw. „Zum Startbildschirm hinzufügen“.')};updateInstall();
-(async()=>{try{await Promise.all([loadDex(),openDB()]);await reloadData();document.querySelector('#status').hidden=true;document.querySelector('#grid').hidden=false;if('serviceWorker'in navigator&&location.protocol!=='file:')navigator.serviceWorker.register('./sw.js').catch(()=>{})}catch(e){document.querySelector('#status').innerHTML=`App konnte nicht geladen werden.<br><span style="font-size:12px">${escapeHtml(e.message||e)}</span>`}})();
+(async()=>{try{await Promise.all([loadDex(),openDB()]);buildPokemonIndexes();await reloadData();document.querySelector('#status').hidden=true;document.querySelector('#grid').hidden=false;if('serviceWorker'in navigator&&location.protocol!=='file:')navigator.serviceWorker.register('./sw.js').catch(()=>{})}catch(e){document.querySelector('#status').innerHTML=`App konnte nicht geladen werden.<br><span style="font-size:12px">${escapeHtml(e.message||e)}</span>`}})();
 </script></body></html>
