@@ -1,4 +1,4 @@
-const CACHE='karten-pokedex-v3-21';
+const CACHE='karten-pokedex-v3-22';
 const CORE=['./','./index.html','./manifest.webmanifest','./icon-192.png','./icon-512.png'];
 
 self.addEventListener('install',event=>{
